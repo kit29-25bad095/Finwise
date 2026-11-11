@@ -1,0 +1,53 @@
+from decimal import Decimal
+from typing import List, Optional
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore"
+    )
+
+    PROJECT_NAME: str = "Finora — Financial Reconciliation & Revenue Leakage Engine"
+    API_V1_STR: str = "/api/v1"
+    ENVIRONMENT: str = "development"
+
+    # Security & JWT
+    SECRET_KEY: str = "finora-super-secure-production-ready-jwt-secret-key-32-chars-min"
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+
+    # Database: Supports PostgreSQL (postgresql://) and SQLite (sqlite://)
+    DATABASE_URL: str = "sqlite:///./finora.db"
+    SYNC_DATABASE_URL: str = "sqlite:///./finora.db"
+
+    # Redis & Background Workers
+    REDIS_URL: str = "redis://localhost:6379/0"
+    WORKER_FALLBACK_SYNC: bool = True
+
+    # AI Investigation Engine (Configurable)
+    AI_PROVIDER: str = "gemini"
+    AI_MODEL: str = "gemini-2.0-flash"
+    AI_API_KEY: Optional[str] = None
+    AI_TEMPERATURE: float = 0.1
+    AI_MAX_TOKENS: int = 2048
+
+    # Financial Calculation Defaults
+    DEFAULT_CURRENCY: str = "INR"
+    DEFAULT_FEE_OVERCHARGE_TOLERANCE: Decimal = Decimal("0.05")
+    DEFAULT_SETTLEMENT_CUTOFF_TIME: str = "23:00"
+    DEFAULT_MAX_KNAPSACK_BOUND: int = 5
+
+    # CORS
+    BACKEND_CORS_ORIGINS: List[str] = [
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8000",
+    ]
+
+
+settings = Settings()
