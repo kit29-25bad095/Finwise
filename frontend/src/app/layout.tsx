@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Finora — AI-Powered Financial Reconciliation & Revenue Leakage Engine",
-  description: "Deterministic three-way financial reconciliation and automated dispute intelligence for Indian D2C brands.",
+  description: "Enterprise three-way financial ledger matching, contractual tariff overcharge detection, and dispute intelligence for Indian D2C enterprises.",
 };
 
 export default function RootLayout({
@@ -12,8 +12,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
-      <body className="bg-background text-slate-100 antialiased selection:bg-sky-500 selection:text-white">
+    <html lang="en">
+      <body className="bg-canvas text-ink-primary antialiased">
         {children}
       </body>
     </html>

@@ -1,11 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { ShieldCheck, ArrowRight, Activity, Database, CheckCircle2, Lock } from "lucide-react";
+import {
+  ArrowRight,
+  ShieldCheck,
+  CheckCircle2,
+  FileSpreadsheet,
+  Lock,
+  ArrowUpRight,
+  Database,
+  GitCompare,
+} from "lucide-react";
 import { ApiClient } from "@/lib/api";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 
-export default function Home() {
+export default function HomePage() {
   const [healthStatus, setHealthStatus] = useState<{ status: string; database: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -16,122 +27,192 @@ export default function Home() {
         setLoading(false);
       })
       .catch(() => {
-        setHealthStatus({ status: "OFFLINE", database: "CONNECTING..." });
+        setHealthStatus({ status: "STANDALONE_DEV", database: "LOCAL" });
         setLoading(false);
       });
   }, []);
 
   return (
-    <main className="min-h-screen bg-background flex flex-col justify-between">
-      {/* Top Header */}
-      <header className="border-b border-border/40 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center font-bold text-white shadow-lg shadow-sky-500/20">
-            F
-          </div>
-          <div>
-            <span className="font-semibold text-lg tracking-tight text-white">Finora</span>
-            <span className="ml-2 text-xs uppercase px-2 py-0.5 rounded bg-sky-950 text-sky-400 border border-sky-800">
-              Phase 1 Core
+    <div className="min-h-screen bg-canvas text-ink-primary flex flex-col justify-between font-sans antialiased selection:bg-[#E4E4E7]">
+      {/* Top Editorial Utility Header */}
+      <header className="h-14 border-b border-border bg-surface px-6 flex items-center justify-between sticky top-0 z-30">
+        <div className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="w-5 h-5 bg-brand-black text-white flex items-center justify-center text-[11px] font-bold tracking-tighter">
+              F
+            </div>
+            <span className="font-semibold text-sm tracking-tight text-ink-primary">
+              Finora
             </span>
-          </div>
+          </Link>
+          <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 border border-border text-ink-secondary bg-canvas">
+            Monochrome Editorial
+          </span>
         </div>
 
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2 text-xs">
-            <span className="relative flex h-2 w-2">
-              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${healthStatus?.status === "ONLINE" ? "bg-emerald-400" : "bg-amber-400"} opacity-75`}></span>
-              <span className={`relative inline-flex rounded-full h-2 w-2 ${healthStatus?.status === "ONLINE" ? "bg-emerald-500" : "bg-amber-500"}`}></span>
-            </span>
-            <span className="text-slate-400">
-              Backend: {loading ? "Probing..." : healthStatus?.status || "OFFLINE"}
-            </span>
+        <div className="flex items-center gap-3 text-xs">
+          <div className="hidden sm:flex items-center gap-2 font-mono text-[11px] text-ink-secondary">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-zinc-800" />
+            <span>Backend: {loading ? "Probing..." : healthStatus?.status || "ONLINE"}</span>
           </div>
           <Link
-            href="/login"
-            className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-dark text-white text-sm font-medium transition shadow-md shadow-sky-600/20 flex items-center space-x-1"
+            href="/dashboard"
+            className="h-8 px-3 text-xs font-medium rounded border border-border bg-surface text-ink-primary hover:bg-hover transition-colors flex items-center gap-1.5"
           >
-            <span>Console Access</span>
-            <ArrowRight className="h-4 w-4" />
+            <span>Merchant Console</span>
+            <ArrowRight className="h-3 w-3" />
+          </Link>
+          <Link
+            href="/login"
+            className="h-8 px-3 text-xs font-medium rounded bg-[#18181B] text-white hover:bg-[#27272A] transition-colors flex items-center gap-1.5"
+          >
+            <span>Sign In</span>
           </Link>
         </div>
       </header>
 
-      {/* Hero Content */}
-      <section className="max-w-5xl mx-auto px-6 py-16 text-center">
-        <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full border border-sky-800/60 bg-sky-950/40 text-xs text-sky-300 mb-6">
-          <ShieldCheck className="h-3.5 w-3.5 text-sky-400" />
-          <span>Zero Discrepancy Without Traceability • Zero Calculation by AI</span>
+      {/* Main Hero & Architectural Overview */}
+      <main className="flex-1 max-w-5xl mx-auto w-full px-6 py-16 space-y-16">
+        {/* Editorial Headline */}
+        <div className="space-y-4 max-w-3xl">
+          <div className="inline-flex items-center gap-2 text-xs font-mono text-ink-secondary border border-border px-2.5 py-1 bg-surface">
+            <span className="font-semibold text-ink-primary">FINANCIAL MANDATE:</span>
+            <span>Zero Discrepancy Without Traceability • Zero Calculation by AI</span>
+          </div>
+
+          <h1 className="text-3xl sm:text-5xl font-semibold tracking-tight text-ink-primary leading-tight">
+            AI-Powered Financial Reconciliation & Revenue Leakage Engine.
+          </h1>
+
+          <p className="text-sm sm:text-base text-ink-secondary leading-relaxed max-w-2xl">
+            Autonomous, deterministic three-way ledger matching across Shopify orders, payment gateways (Razorpay), and bank statements for Indian mid-sized D2C enterprises.
+          </p>
+
+          <div className="pt-2 flex flex-wrap items-center gap-3">
+            <Link
+              href="/dashboard"
+              className="h-10 px-5 text-xs font-medium rounded bg-[#18181B] text-white hover:bg-[#27272A] transition-colors flex items-center gap-2"
+            >
+              <span>Launch Financial Workspace</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+            <Link
+              href="/dashboard/reconciliation"
+              className="h-10 px-5 text-xs font-medium rounded border border-border bg-surface text-ink-primary hover:bg-hover transition-colors flex items-center gap-2 font-mono"
+            >
+              <span>Explore Reconciliation Ledger →</span>
+            </Link>
+          </div>
         </div>
 
-        <h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-white leading-tight">
-          AI-Powered Financial Reconciliation & <br />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-cyan-300 to-emerald-400">
-            Revenue Leakage Engine
-          </span>
-        </h1>
-
-        <p className="mt-6 text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed">
-          Autonomous three-way financial ledger matching across Shopify, Payment Gateways (Razorpay), and Bank Statements for Indian D2C enterprises.
-        </p>
-
-        <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Link
-            href="/login"
-            className="w-full sm:w-auto px-6 py-3 rounded-xl bg-primary hover:bg-primary-dark text-white font-medium transition shadow-lg shadow-sky-600/30 flex items-center justify-center space-x-2"
-          >
-            <span>Launch Merchant Console</span>
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-          <a
-            href="http://localhost:8000/api/v1/docs"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full sm:w-auto px-6 py-3 rounded-xl bg-surface hover:bg-surfaceLight border border-border text-slate-300 text-sm font-medium transition flex items-center justify-center space-x-2"
-          >
-            <Database className="h-4 w-4 text-slate-400" />
-            <span>Interactive OpenAPI Specs</span>
-          </a>
-        </div>
-
-        {/* Phase 1 Verification Grid */}
-        <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
-          <div className="p-6 rounded-xl border border-border/50 bg-surface/60 backdrop-blur">
-            <div className="h-10 w-10 rounded-lg bg-sky-950/80 border border-sky-800/60 flex items-center justify-center text-sky-400 mb-4">
-              <Lock className="h-5 w-5" />
+        {/* Core Principles Grid */}
+        <div className="border border-border bg-surface divide-y sm:divide-y-0 sm:divide-x divide-border grid grid-cols-1 sm:grid-cols-3">
+          <div className="p-6 space-y-2">
+            <div className="text-[10px] uppercase font-mono text-ink-muted font-semibold">
+              MANDATE 01
             </div>
-            <h3 className="font-semibold text-white text-base">Multi-Tenant Isolation</h3>
-            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-              Cryptographically verified JWT tenant claims with PostgreSQL Row-Level Security (RLS) policies.
+            <h2 className="text-xs font-semibold text-ink-primary">
+              Traceability & Provenance
+            </h2>
+            <p className="text-xs text-ink-secondary leading-relaxed">
+              Every identified variance retains cryptographic provenance back to SHA-256 source file checksums and ledger row indices.
             </p>
           </div>
 
-          <div className="p-6 rounded-xl border border-border/50 bg-surface/60 backdrop-blur">
-            <div className="h-10 w-10 rounded-lg bg-emerald-950/80 border border-emerald-800/60 flex items-center justify-center text-emerald-400 mb-4">
-              <Activity className="h-5 w-5" />
+          <div className="p-6 space-y-2">
+            <div className="text-[10px] uppercase font-mono text-ink-muted font-semibold">
+              MANDATE 02
             </div>
-            <h3 className="font-semibold text-white text-base">Configurable Tariffs</h3>
-            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-              MDR, GST, cutoff times, and tolerance parameters dynamically parameterized per tenant contract.
+            <h2 className="text-xs font-semibold text-ink-primary">
+              Evidence Before Claims
+            </h2>
+            <p className="text-xs text-ink-secondary leading-relaxed">
+              Suspected discrepancies are never categorized as confirmed financial losses without contractual tariff and banking substantiation.
             </p>
           </div>
 
-          <div className="p-6 rounded-xl border border-border/50 bg-surface/60 backdrop-blur">
-            <div className="h-10 w-10 rounded-lg bg-cyan-950/80 border border-cyan-800/60 flex items-center justify-center text-cyan-400 mb-4">
-              <CheckCircle2 className="h-5 w-5" />
+          <div className="p-6 space-y-2">
+            <div className="text-[10px] uppercase font-mono text-ink-muted font-semibold">
+              MANDATE 03
             </div>
-            <h3 className="font-semibold text-white text-base">Arbitrary Precision</h3>
-            <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-              Zero floating-point arithmetic. Python Decimal and NUMERIC(18, 4) database storage.
+            <h2 className="text-xs font-semibold text-ink-primary">
+              Zero Calculation by AI
+            </h2>
+            <p className="text-xs text-ink-secondary leading-relaxed">
+              100% of financial calculations, MDR tariffs, and allocations are pure deterministic Python Decimals. AI acts strictly as an investigative analyst.
             </p>
           </div>
         </div>
-      </section>
+
+        {/* Live Workspace Preview Matrix */}
+        <div className="bg-surface border border-border p-6 space-y-4">
+          <div className="flex items-center justify-between border-b border-border pb-3">
+            <div>
+              <span className="text-[10px] uppercase font-mono text-ink-muted font-semibold">
+                SYSTEM OF RECORD
+              </span>
+              <h2 className="text-sm font-semibold text-ink-primary">
+                High-Density Ledger Modules
+              </h2>
+            </div>
+            <span className="text-xs font-mono text-ink-muted">
+              PostgreSQL NUMERIC(18,4)
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+            <Link
+              href="/dashboard"
+              className="p-3 border border-border hover:bg-hover transition-colors block"
+            >
+              <div className="font-semibold text-ink-primary mb-1">Financial Overview</div>
+              <p className="text-ink-secondary text-[11px]">8 summary metrics, settlement health, and leakage overview.</p>
+            </Link>
+
+            <Link
+              href="/dashboard/reconciliation"
+              className="p-3 border border-border hover:bg-hover transition-colors block"
+            >
+              <div className="font-semibold text-ink-primary mb-1">Reconciliation Workspace</div>
+              <p className="text-ink-secondary text-[11px]">High-density 44px rows with interactive right-side Audit Drawer.</p>
+            </Link>
+
+            <Link
+              href="/dashboard/exceptions"
+              className="p-3 border border-border hover:bg-hover transition-colors block"
+            >
+              <div className="font-semibold text-ink-primary mb-1">Exception Management</div>
+              <p className="text-ink-secondary text-[11px]">Lifecycle tracking across the four core leakage detectors.</p>
+            </Link>
+
+            <Link
+              href="/dashboard/data-sources"
+              className="p-3 border border-border hover:bg-hover transition-colors block"
+            >
+              <div className="font-semibold text-ink-primary mb-1">Data Ingestion Wizard</div>
+              <p className="text-ink-secondary text-[11px]">8-step multipart parser, DDE formula sanitizer, and column mapper.</p>
+            </Link>
+          </div>
+        </div>
+      </main>
 
       {/* Footer */}
-      <footer className="border-t border-border/40 px-6 py-6 text-center text-xs text-slate-500">
-        Finora Engine v1.0.0 • Phase 1 Scaffolding Complete • Indian D2C Financial Intelligence
+      <footer className="border-t border-border bg-surface px-6 py-6 text-xs text-ink-secondary">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-[11px]">
+          <div>
+            FINORA — AI-POWERED FINANCIAL RECONCILIATION & REVENUE LEAKAGE ENGINE
+          </div>
+          <div className="flex items-center gap-4 text-ink-muted">
+            <a href="http://localhost:8000/api/v1/docs" target="_blank" rel="noreferrer" className="hover:text-ink-primary">
+              OpenAPI Specs
+            </a>
+            <span>•</span>
+            <Link href="/dashboard/settings" className="hover:text-ink-primary">
+              Configuration
+            </Link>
+          </div>
+        </div>
       </footer>
-    </main>
+    </div>
   );
 }

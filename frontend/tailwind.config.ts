@@ -10,21 +10,52 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "#090d16", // Deep enterprise charcoal navy
-        surface: "#0f172a",    // Slate 900
-        surfaceLight: "#1e293b", // Slate 800
-        border: "#334155",      // Slate 700
-        primary: {
-          DEFAULT: "#0284c7",   // Sky 600
-          foreground: "#ffffff",
-          dark: "#0369a1",
+        canvas: "#F9FAFB",
+        surface: "#FFFFFF",
+        ink: {
+          primary: "#09090B",
+          secondary: "#71717A",
+          muted: "#A1A1AA",
         },
-        accent: {
-          emerald: "#10b981",  // Emerald 500
-          cyan: "#06b6d4",     // Cyan 500
-          amber: "#f59e0b",    // Amber 500
-          rose: "#f43f5e",     // Rose 500
+        border: {
+          DEFAULT: "#E4E4E7",
+          subtle: "#E4E4E7",
+          dark: "#D4D4D8",
         },
+        hover: "#F4F4F5",
+        brand: {
+          black: "#18181B",
+          dark: "#09090B",
+        },
+        semantic: {
+          leakage: {
+            text: "#DC2626",
+            bg: "#FEF2F2",
+            border: "#FECACA",
+          },
+          pending: {
+            text: "#D97706",
+            bg: "#FFFBEB",
+            border: "#FDE68A",
+          },
+          matched: {
+            text: "#52525B",
+            bg: "#F4F4F5",
+            border: "#E4E4E7",
+          },
+        },
+      },
+      fontFamily: {
+        sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif"],
+        mono: ["JetBrains Mono", "SF Mono", "Consolas", "Liberation Mono", "Menlo", "monospace"],
+      },
+      width: {
+        sidebar: "220px",
+        drawer: "480px",
+      },
+      height: {
+        topbar: "56px",
+        tableRow: "44px",
       },
     },
   },

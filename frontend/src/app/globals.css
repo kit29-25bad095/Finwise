@@ -2,34 +2,53 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 241, 245, 249;
-  --background-start-rgb: 9, 13, 22;
-  --background-end-rgb: 15, 23, 42;
+@layer base {
+  :root {
+    --canvas: #F9FAFB;
+    --surface: #FFFFFF;
+    --ink-primary: #09090B;
+    --ink-secondary: #71717A;
+    --ink-muted: #A1A1AA;
+    --border-subtle: #E4E4E7;
+  }
+
+  body {
+    background-color: #F9FAFB;
+    color: #09090B;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+  }
+
+  /* Financial numbers: always tabular figures and JetBrains Mono */
+  .font-mono, code, kbd, samp, pre {
+    font-family: "JetBrains Mono", "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+    font-variant-numeric: tabular-nums lining-nums;
+  }
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: #090d16;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  min-height: 100vh;
-}
-
-/* Custom scrollbars for high-density tables */
+/* Minimalist editorial scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: #F4F4F5;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 3px;
+  background: #D4D4D8;
+  border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #A1A1AA;
+}
+
+/* Text selection */
+::selection {
+  background-color: #E4E4E7;
+  color: #09090B;
 }
