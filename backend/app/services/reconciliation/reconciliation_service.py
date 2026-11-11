@@ -799,9 +799,12 @@ class ReconciliationService:
         for prev_run in previous_runs:
             prev_run.is_active = False
             # Supersede allocations of previous run
-            db.execute(
+            prev_allocs = db.execute(
                 select(ReconciliationAllocation).where(ReconciliationAllocation.run_id == prev_run.id)
-            )
+            ).scalars().all()
+            for pa in prev_allocs:
+                pa.status = AllocationStatus.SUPERSEDED.value
+
             # Record run delta
             delta = ReconciliationRunDelta(
                 tenant_id=tenant_id,
@@ -898,17 +901,34 @@ class ReconciliationService:
                         status=AllocationStatus.ACTIVE.value
                     )
                     db.add(alloc)
+                    if match.settlement_id:
+                        s_ent = db.get(CanonicalSettlement, match.settlement_id)
+                        if s_ent:
+                            s_ent.unallocated_balance = max(Decimal("0.0000"), s_ent.unallocated_balance - amt_to_alloc)
+                    if match.bank_transaction_id:
+                        b_ent = db.get(CanonicalBankTransaction, match.bank_transaction_id)
+                        if b_ent:
+                            b_ent.unallocated_balance = max(Decimal("0.0000"), b_ent.unallocated_balance - amt_to_alloc)
 
         elif action_upper == "REJECT":
             match.review_status = ReviewStatus.REJECTED.value
-            # If allocations were made, mark them reversed
+            # If allocations were made, mark them reversed and restore balance
             for alloc in match.allocations:
                 alloc.status = AllocationStatus.REVERSED.value
+                if match.settlement_id:
+                    s_ent = db.get(CanonicalSettlement, match.settlement_id)
+                    if s_ent:
+                        s_ent.unallocated_balance += alloc.allocated_amount
+                if match.bank_transaction_id:
+                    b_ent = db.get(CanonicalBankTransaction, match.bank_transaction_id)
+                    if b_ent:
+                        b_ent.unallocated_balance += alloc.allocated_amount
 
         elif action_upper == "MANUAL_ALLOCATE":
             match.review_status = ReviewStatus.RESOLVED.value
             if manual_amount and manual_amount > Decimal("0.0000"):
                 match.allocated_amount = manual_amount
+                target_id = target_entity_id or match.bank_transaction_id or match.payment_id
                 alloc = ReconciliationAllocation(
                     tenant_id=tenant_id,
                     run_id=match.run_id,
@@ -916,11 +936,19 @@ class ReconciliationService:
                     source_entity_type="canonical_settlements" if match.settlement_id else "canonical_orders",
                     source_entity_id=match.settlement_id or match.order_id,
                     target_entity_type="canonical_bank_transactions" if match.bank_transaction_id else "canonical_payments",
-                    target_entity_id=target_entity_id or match.bank_transaction_id or match.payment_id,
+                    target_entity_id=target_id,
                     allocated_amount=manual_amount,
                     status=AllocationStatus.ACTIVE.value
                 )
                 db.add(alloc)
+                if match.settlement_id:
+                    s_ent = db.get(CanonicalSettlement, match.settlement_id)
+                    if s_ent:
+                        s_ent.unallocated_balance = max(Decimal("0.0000"), s_ent.unallocated_balance - manual_amount)
+                if match.bank_transaction_id:
+                    b_ent = db.get(CanonicalBankTransaction, match.bank_transaction_id)
+                    if b_ent:
+                        b_ent.unallocated_balance = max(Decimal("0.0000"), b_ent.unallocated_balance - manual_amount)
 
         # Audit Log
         audit = AuditLog(
