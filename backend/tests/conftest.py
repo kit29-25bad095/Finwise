@@ -23,6 +23,7 @@ from app.models.user import User
 import app.models  # ensure models are registered
 from app.main import app as fastapi_app
 import app.workers.ingestion_tasks
+import app.workers.reconciliation_tasks
 
 test_engine = create_engine(
     "sqlite://",
@@ -40,6 +41,7 @@ TestSessionLocal = sessionmaker(
 app.core.database.engine = test_engine
 app.core.database.SessionLocal = TestSessionLocal
 app.workers.ingestion_tasks.SessionLocal = TestSessionLocal
+app.workers.reconciliation_tasks.SessionLocal = TestSessionLocal
 
 
 @pytest.fixture(autouse=True)

@@ -11,6 +11,19 @@ from app.models.canonical import (
     CanonicalRefund,
     CanonicalBankTransaction,
 )
+from app.models.reconciliation import (
+    ReconciliationRun,
+    ReconciliationMatch,
+    ReconciliationAllocation,
+    ReconciliationRunDelta,
+    FeeContract,
+    FeeScheduleTier,
+    ReconciliationStatus,
+    MatchType,
+    MatchClassification,
+    ReviewStatus,
+    AllocationStatus,
+)
 
 __all__ = [
     "Base",
@@ -29,4 +42,15 @@ __all__ = [
     "CanonicalSettlement",
     "CanonicalRefund",
     "CanonicalBankTransaction",
+    "ReconciliationRun",
+    "ReconciliationMatch",
+    "ReconciliationAllocation",
+    "ReconciliationRunDelta",
+    "FeeContract",
+    "FeeScheduleTier",
+    "ReconciliationStatus",
+    "MatchType",
+    "MatchClassification",
+    "ReviewStatus",
+    "AllocationStatus",
 ]
