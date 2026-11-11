@@ -348,21 +348,6 @@ Comprehensive architectural specifications are located in the [`docs/`](./docs) 
 
 ---
 
-## Project Status & Implementation Roadmap
-
-```
-[Phase 0: Architecture & Specification] ──▶ [VERIFIED & COMPLETED]
-[Phase 1: Project Foundation & Auth]    ──▶ [VERIFIED & COMPLETED (18/18 Tests)]
-[Phase 2: Ingestion & Normalization]    ──▶ [PENDING AUTHORIZATION]
-[Phase 3: Financial Reconciliation]     ──▶ [SCHEDULED (Week 3)]
-[Phase 4: Revenue Leakage Detectors]    ──▶ [SCHEDULED (Week 4)]
-[Phase 5: AI Forensic Investigator]     ──▶ [SCHEDULED (Week 5)]
-[Phase 6: Financial Review Dashboard]   ──▶ [SCHEDULED (Week 6)]
-[Phase 7: Pilot Hardening & Holdout]    ──▶ [SCHEDULED (Week 6)]
-```
-
----
-
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
