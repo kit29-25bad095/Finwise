@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ApiClient, User, TenantMembership } from "@/lib/api";
-
+import { Logo } from "@/components/ui/Logo";
 interface SidebarProps {
   user: User | null;
   memberships: TenantMembership[];
@@ -96,9 +96,7 @@ export function Sidebar({
         {/* Top: Finora Wordmark & Minimalist Monogram */}
         <div className="h-14 px-4 border-b border-border flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="w-5 h-5 bg-brand-black text-white flex items-center justify-center text-[11px] font-bold tracking-tighter">
-              F
-            </div>
+            <Logo size={20} />
             <span className="font-semibold text-sm tracking-tight text-ink-primary">
               Finora
             </span>

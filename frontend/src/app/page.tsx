@@ -15,6 +15,7 @@ import {
 import { ApiClient } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { Logo } from "@/components/ui/Logo";
 
 export default function HomePage() {
   const [healthStatus, setHealthStatus] = useState<{ status: string; database: string } | null>(null);
@@ -37,10 +38,8 @@ export default function HomePage() {
       {/* Top Editorial Utility Header */}
       <header className="h-14 border-b border-border bg-surface px-6 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-3">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-5 h-5 bg-brand-black text-white flex items-center justify-center text-[11px] font-bold tracking-tighter">
-              F
-            </div>
+          <Link href="/" className="flex items-center gap-2.5">
+            <Logo size={22} />
             <span className="font-semibold text-sm tracking-tight text-ink-primary">
               Finora
             </span>

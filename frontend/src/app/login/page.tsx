@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Lock, ArrowRight, ShieldCheck, AlertCircle, Building2 } from "lucide-react";
 import { ApiClient } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
+import { Logo } from "@/components/ui/Logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -67,10 +68,8 @@ export default function LoginPage() {
     <div className="min-h-screen bg-canvas flex flex-col justify-between text-ink-primary font-sans antialiased">
       {/* Top Simple Brand Bar */}
       <header className="h-14 border-b border-border bg-surface px-6 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="w-5 h-5 bg-brand-black text-white flex items-center justify-center text-[11px] font-bold tracking-tighter">
-            F
-          </div>
+        <Link href="/" className="flex items-center gap-2.5">
+          <Logo size={22} />
           <span className="font-semibold text-sm tracking-tight text-ink-primary">
             Finora
           </span>
@@ -84,7 +83,8 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-sm bg-surface border border-border shadow-xs p-6 space-y-5">
           {/* Header */}
-          <div className="text-center space-y-1">
+          <div className="text-center space-y-2 flex flex-col items-center">
+            <Logo size={36} className="mb-1" />
             <h1 className="text-base font-semibold text-ink-primary tracking-tight">
               {mode === "login" ? "Sign In to Financial Workspace" : "Register Enterprise Organization"}
             </h1>
