@@ -1,10 +1,11 @@
-from fastapi import FastAPI, status
+from fastapi import FastAPI, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.database import engine
-from app.api.v1 import auth, tenants
+from app.core.database import get_db_session
+from app.api.v1 import auth, tenants, ingestion
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -27,15 +28,15 @@ app.add_middleware(
 # Register API Routers
 app.include_router(auth.router, prefix=settings.API_V1_STR)
 app.include_router(tenants.router, prefix=settings.API_V1_STR)
+app.include_router(ingestion.router, prefix=settings.API_V1_STR)
 
 
 @app.get("/health", status_code=status.HTTP_200_OK, tags=["System"])
 @app.get(f"{settings.API_V1_STR}/health", status_code=status.HTTP_200_OK, tags=["System"])
-async def healthcheck():
+def healthcheck(db: Session = Depends(get_db_session)):
     db_status = "HEALTHY"
     try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
+        db.execute(text("SELECT 1"))
     except Exception as e:
         db_status = f"UNHEALTHY: {str(e)}"
 

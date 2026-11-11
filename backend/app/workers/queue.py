@@ -62,3 +62,6 @@ class WorkerDispatcher:
             }
         else:
             raise RuntimeError("Redis task queue is unavailable and synchronous fallback is disabled.")
+
+
+enqueue_job = WorkerDispatcher.dispatch_job

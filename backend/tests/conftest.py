@@ -4,26 +4,31 @@ import pytest
 from typing import Generator
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
+from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import Session, sessionmaker
 
 os.environ["ENVIRONMENT"] = "test"
-os.environ["DATABASE_URL"] = "sqlite:///./test_finora.db"
-os.environ["SYNC_DATABASE_URL"] = "sqlite:///./test_finora.db"
+os.environ["DATABASE_URL"] = "sqlite://"
+os.environ["SYNC_DATABASE_URL"] = "sqlite://"
 os.environ["REDIS_URL"] = "redis://localhost:6379/1"
 os.environ["WORKER_FALLBACK_SYNC"] = "true"
 
 from app.core.config import settings
 from app.core.database import Base, get_db_session
+import app.core.database
 from app.core.security import get_password_hash, create_access_token
 from app.core.rbac import Role
 from app.models.tenant import Tenant, TenantMembership
 from app.models.user import User
-from app.main import app
+import app.models  # ensure models are registered
+from app.main import app as fastapi_app
+import app.workers.ingestion_tasks
 
 test_engine = create_engine(
-    "sqlite:///./test_finora.db",
+    "sqlite://",
     echo=False,
-    connect_args={"check_same_thread": False}
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
 )
 
 TestSessionLocal = sessionmaker(
@@ -31,6 +36,10 @@ TestSessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False
 )
+
+app.core.database.engine = test_engine
+app.core.database.SessionLocal = TestSessionLocal
+app.workers.ingestion_tasks.SessionLocal = TestSessionLocal
 
 
 @pytest.fixture(autouse=True)
@@ -58,9 +67,9 @@ def client(db_session: Session) -> Generator[TestClient, None, None]:
         finally:
             pass
 
-    app.dependency_overrides[get_db_session] = override_get_db
-    yield TestClient(app)
-    app.dependency_overrides.clear()
+    fastapi_app.dependency_overrides[get_db_session] = override_get_db
+    yield TestClient(fastapi_app)
+    fastapi_app.dependency_overrides.clear()
 
 
 @pytest.fixture
@@ -146,4 +155,8 @@ def seeded_entities(db_session: Session):
         "token_manager_a": token_manager_a,
         "token_auditor_a": token_auditor_a,
         "token_admin_b": token_admin_b,
+        "headers_a_admin": {"Authorization": f"Bearer {token_admin_a}"},
+        "headers_a_manager": {"Authorization": f"Bearer {token_manager_a}"},
+        "headers_a_auditor": {"Authorization": f"Bearer {token_auditor_a}"},
+        "headers_b_admin": {"Authorization": f"Bearer {token_admin_b}"},
     }
