@@ -246,11 +246,11 @@ cd frontend
 # Install Node dependencies
 npm install
 
-# Start local Next.js development server (runs on port 3000)
-npm run dev -- -p 3000
+# Start local Next.js development server (runs on port 3100)
+npm run dev
 ```
-- Web Application Console: [`http://localhost:3000`](http://localhost:3000)
-- Sign In & Tenant Registration: [`http://localhost:3000/login`](http://localhost:3000/login)
+- Web Application Console: [`http://localhost:3100`](http://localhost:3100)
+- Sign In & Tenant Registration: [`http://localhost:3100/login`](http://localhost:3100/login)
 
 ---
 

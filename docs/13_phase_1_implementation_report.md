@@ -231,7 +231,7 @@ To independently verify the Phase 1 deliverables:
 4. **Launch Application Locally:**
    - Backend: `cd backend && uvicorn app.main:app --reload --port 8000`
    - Frontend: `cd frontend && npm run dev`
-   - Visit: `http://localhost:3000`
+   - Visit: `http://localhost:3100`
 
 ---
 
