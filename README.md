@@ -17,6 +17,7 @@
 [Architecture](#system-architecture) •
 [Deterministic Reconciliation Pipeline](#deterministic-reconciliation-pipeline) •
 [The Four Core Leakage Detectors](#the-four-core-leakage-detectors) •
+[Enterprise Review Dashboard](#enterprise-review-dashboard) •
 [Technology Stack](#technology-stack) •
 [Quick Start](#quick-start-guide) •
 [Automated Test Verification](#verification--automated-testing) •
@@ -183,6 +184,27 @@ $$\mathcal{D}_k: (\mathcal{L}_{\text{canonical}}, \mathcal{C}_{\text{contract}},
 
 ---
 
+## Enterprise Review Dashboard
+
+Finora features a high-density, monochrome editorial dashboard built for finance controllers, operations teams, and auditors:
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ FINORA FINANCIAL REVIEW WORKSPACE                                                                   │
+├────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ • Executive Overview: Live Three-Way Ledger Flow (Shopify → Razorpay → Settlements → HDFC Credits)│
+│ • Revenue Leakage Monitoring: 4 Detector cards, severity filtering, side-by-side discrepancy diffs │
+│ • Reconciliation Run Manager: Full execution history, status badges, and single-click Run N+1      │
+│ • Human Review Queue: Decision modal for APPROVE, REJECT, and MANUAL_ALLOCATE with mandatory notes │
+│ • Canonical Explorer: Filterable dual-tab inspector for Orders, Payments, Settlements & Bank Txns │
+│ • Contract & Fee Analytics: Tariff tiers (UPI, CC, DC, NetBanking), dynamic GST %, and fee drift   │
+│ • Forensic Investigations: Grounded AI evidence viewer (with graceful unconfigured provider state) │
+│ • Immutable Audit Ledger: Cryptographically tracked user mutations, timestamps, and IP provenance │
+└────────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Technology Stack
 
 | Layer | Technology | Rationale & Configuration |
@@ -210,20 +232,25 @@ Finwise/
 │   │   │   ├── tenants.py      # Tenant settings and member management
 │   │   │   ├── ingestion.py    # CSV multipart upload, batch progress, error export
 │   │   │   ├── reconciliation.py # Runs, matches, ambiguous review, contracts
+│   │   │   ├── leakage.py      # Phase 4 detector execution, findings, review actions
+│   │   │   ├── forensic.py     # Phase 5 AI investigations, evidence packs, claim drafts
+│   │   │   ├── dashboard.py    # Phase 6 executive overview, 3-way flow, review queue
 │   │   │   └── health.py       # Liveness and readiness probes
 │   │   ├── core/               # Configuration, database engine, security, RBAC
-│   │   ├── models/             # SQLAlchemy entities (Tenant, User, Canonical, Recon)
+│   │   ├── models/             # SQLAlchemy entities (Tenant, Canonical, Recon, Leakage, Forensic)
 │   │   ├── schemas/            # Pydantic validation schemas
 │   │   ├── services/           # Domain services
 │   │   │   ├── auth_service.py # Authentication & password hashing
 │   │   │   ├── tenant_service.py # Multi-tenant isolation & memberships
 │   │   │   ├── ingestion/      # Shopify, Razorpay, HDFC adapters & sanitizers
-│   │   │   └── reconciliation/ # Fee calculator, scoring engine, knapsack solver
+│   │   │   ├── reconciliation/ # Fee calculator, scoring engine, knapsack solver
+│   │   │   ├── leakage/        # 4 core detectors, banking calendars, clearing verifiers
+│   │   │   ├── forensics/      # Evidence bundle builder, confidence scoring, claim drafts
+│   │   │   └── dashboard_service.py # Authoritative metrics, 3-way flow, review queue
 │   │   ├── workers/            # RQ background worker tasks
 │   │   └── main.py             # FastAPI entrypoint, CORS, exception handlers
-│   ├── alembic/                # Migration scripts
-│   │   └── versions/           # 001_initial, 002_ingestion, 003_reconciliation
-│   ├── tests/                  # 15 automated test suites (49 passing tests)
+│   ├── alembic/                # Migration scripts (001 to 007)
+│   ├── tests/                  # 27 automated test suites (175 passing tests)
 │   ├── requirements.txt        # Pinned production dependencies
 │   ├── pytest.ini              # Test runner configuration
 │   └── Dockerfile              # Containerized backend build
@@ -232,18 +259,24 @@ Finwise/
 │   ├── src/
 │   │   ├── app/                # Next.js App Router (Port 3100)
 │   │   │   ├── login/          # Monochrome login page
-│   │   │   ├── dashboard/      # Overview, Reconciliation, Transactions, Settlements
+│   │   │   ├── dashboard/      # Executive Overview & 3-Way Reconciliation Flow
+│   │   │   │   ├── leakage-detection/ # Dedicated 4-detector revenue leakage workspace
+│   │   │   │   ├── reconciliation/    # Run management, execution history, Run N+1
+│   │   │   │   ├── exceptions/        # Human Review Queue for ambiguous matches
+│   │   │   │   ├── transactions/      # Canonical Transaction Explorer
+│   │   │   │   ├── contracts/         # Versioned contract tariffs & fee analytics
+│   │   │   │   ├── investigations/    # AI forensic investigation dossier viewer
+│   │   │   │   └── audit/             # Immutable audit trail
 │   │   │   └── page.tsx        # High-density landing page
 │   │   ├── components/         # Reusable UI widgets and layout shells
-│   │   │   ├── sidebar.tsx     # Finora wordmark, 220px fixed navigation
-│   │   │   ├── topbar.tsx      # Workspace switcher, breadcrumbs, user pill
-│   │   │   └── ui/             # Monochrome editorial components
-│   │   └── lib/                # Typed API client, currency formatters
+│   │   │   ├── shell/          # Topbar, Sidebar, Navigation shells
+│   │   │   └── ui/             # Monochrome editorial components (Button, Modal, Drawer)
+│   │   └── lib/                # Typed API client, Indian Rupee & date formatters
 │   ├── package.json            # Node.js dependencies
 │   ├── tsconfig.json           # TypeScript configuration
 │   └── tailwind.config.ts      # Strict monochrome theme tokens
 │
-├── docs/                       # 15 Formal Architectural, QA & Audit Specifications
+├── docs/                       # 21 Formal Architectural, QA & Audit Specifications
 ├── docker-compose.yml          # Multi-container orchestration (DB, Redis, Backend, Frontend)
 ├── .env.example                # Canonical environment variable template
 └── README.md                   # Enterprise technical documentation
@@ -260,7 +293,7 @@ Finwise/
 
 ---
 
-### Option A: Running Locally (Development Mode)
+### Running Locally (Development Mode)
 
 #### 1. Backend Setup
 ```bash
@@ -287,7 +320,9 @@ cd frontend
 # Install Node dependencies
 npm install
 
-# Start local Next.js development server (runs on port 3100)
+# Start local Next.js production server (runs on port 3100)
+npm run start
+# Or for local development hot-reloading:
 npm run dev
 ```
 - Web Application Console: [`http://localhost:3100`](http://localhost:3100)
@@ -295,7 +330,17 @@ npm run dev
 
 ---
 
-### Option B: Running with Docker Compose (Full Stack)
+### Default Testing Credentials
+
+| Role | Email | Password | Access Scope |
+|---|---|---|---|
+| **Tenant Admin** | `admin@alpha.com` | `Password123!` | Complete administrative access, user management, tariff contract configuration, reconciliation runs, review decisions |
+| **Finance Manager** | `manager@alpha.com` | `Password123!` | Trigger reconciliation runs, approve/reject/manual-allocate review items, inspect financial leakage |
+| **Auditor** | `auditor@alpha.com` | `Password123!` | Read-only inspection across all ledgers, transaction records, audit logs (review mutations prohibited) |
+
+---
+
+### Running with Docker Compose (Full Stack)
 
 ```bash
 # Copy environment configuration
