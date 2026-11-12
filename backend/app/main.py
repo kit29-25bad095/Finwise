@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db_session
-from app.api.v1 import auth, tenants, ingestion, reconciliation, leakage, forensic
+from app.api.v1 import auth, tenants, ingestion, reconciliation, leakage, forensic, dashboard
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -32,6 +32,7 @@ app.include_router(ingestion.router, prefix=settings.API_V1_STR)
 app.include_router(reconciliation.router, prefix=settings.API_V1_STR)
 app.include_router(leakage.router, prefix=settings.API_V1_STR)
 app.include_router(forensic.router, prefix=settings.API_V1_STR)
+app.include_router(dashboard.router, prefix=settings.API_V1_STR)
 
 
 @app.get("/health", status_code=status.HTTP_200_OK, tags=["System"])

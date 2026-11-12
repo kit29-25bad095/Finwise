@@ -1,530 +1,328 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import {
-  Search,
-  Filter,
-  Download,
-  Calendar,
-  Layers,
-  ChevronLeft,
-  ChevronRight,
-  SlidersHorizontal,
-  X,
-  FileSpreadsheet,
-} from "lucide-react";
+import React, { useState, useEffect } from "react";
 import { Topbar } from "@/components/shell/Topbar";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { formatINR, formatDate } from "@/lib/utils";
-import { AuditDrawer, TransactionAuditItem } from "@/components/drawer/AuditDrawer";
+import { formatINR, formatDateTime } from "@/lib/utils";
+import { ApiClient, ReconciliationRun } from "@/lib/api";
+import {
+  GitCompare,
+  RefreshCw,
+  Search,
+  CheckCircle2,
+  Clock,
+  Layers,
+  ChevronRight,
+  SlidersHorizontal,
+  X,
+  ShieldCheck,
+  AlertOctagon,
+  ArrowRight,
+  TrendingDown,
+} from "lucide-react";
 
 export default function ReconciliationWorkspacePage() {
-  const [selectedItem, setSelectedItem] = useState<TransactionAuditItem | null>(null);
+  const [runs, setRuns] = useState<ReconciliationRun[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedRun, setSelectedRun] = useState<ReconciliationRun | null>(null);
+  const [triggering, setTriggering] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
-  const [runSelector, setRunSelector] = useState("ALL_RUNS");
-  const [dateFilter, setDateFilter] = useState("ALL_TIME");
-  const [page, setPage] = useState(1);
-  const pageSize = 10;
 
-  // Realistic authoritative ledger dataset
-  const rawLedger: TransactionAuditItem[] = [
-    {
-      id: "tx-001",
-      orderId: "ORD-98420",
-      paymentId: "pay_Oz91M202Kaa",
-      gatewayRef: "settle_batch_90412",
-      settlementRef: "SETL-20261110-09",
-      bankUtr: "HDFCR5202611110098",
-      orderDate: "2026-11-10",
-      shopifyGross: 15400.0,
-      gatewayCapture: 15400.0,
-      mdrFee: 284.9,
-      applicableGst: 51.28,
-      refundsAdjustments: 0.0,
-      settlementNet: 15063.82,
-      bankCredit: 15063.82,
-      variance: 0.0,
-      matchStatus: "MATCHED_PASS_1",
-      matchingMethod: "Pass 1: Exact Gateway Payment ID & Order Ref",
-      ruleVersion: "RULE-2026-V1.2",
-      runId: "RUN-2026-11-12-01",
-      sourceFile: "shopify_orders_nov2026.csv",
-      sourceRow: 141,
-    },
-    {
-      id: "tx-002",
-      orderId: "ORD-98421",
-      paymentId: "pay_Oz91M203Nba",
-      gatewayRef: "settle_batch_90412",
-      settlementRef: "SETL-20261110-09",
-      bankUtr: "HDFCR5202611110098",
-      orderDate: "2026-11-10",
-      shopifyGross: 12500.0,
-      gatewayCapture: 12500.0,
-      mdrFee: 231.25,
-      applicableGst: 41.63,
-      refundsAdjustments: 0.0,
-      settlementNet: 12227.12,
-      bankCredit: 12227.12,
-      variance: 0.0,
-      matchStatus: "MATCHED_PASS_1",
-      matchingMethod: "Pass 1: Exact Gateway Payment ID & Order Ref",
-      ruleVersion: "RULE-2026-V1.2",
-      runId: "RUN-2026-11-12-01",
-      sourceFile: "shopify_orders_nov2026.csv",
-      sourceRow: 142,
-    },
-    {
-      id: "tx-003",
-      orderId: "ORD-98422",
-      paymentId: "pay_Oz91M204Kpq",
-      gatewayRef: "settle_batch_90412",
-      settlementRef: "SETL-20261110-09",
-      bankUtr: "HDFCR5202611110098",
-      orderDate: "2026-11-10",
-      shopifyGross: 8400.0,
-      gatewayCapture: 8400.0,
-      mdrFee: 180.6,
-      applicableGst: 32.51,
-      refundsAdjustments: 0.0,
-      settlementNet: 8186.89,
-      bankCredit: 8150.89,
-      variance: -36.0,
-      matchStatus: "LEAKAGE_OVERCHARGE",
-      matchingMethod: "Pass 3: Contractual Tariff Overcharge Detector",
-      ruleVersion: "RULE-2026-V1.2",
-      runId: "RUN-2026-11-12-01",
-      sourceFile: "razorpay_settlement_nov2026.csv",
-      sourceRow: 89,
-      investigation: {
-        hypotheses: ["Applied 2.15% fee card instead of contractual 1.85% D2C rate."],
-        supportingEvidence: ["Contract Agreement Tariff: Schedule B (1.85% + 18% GST)", "Reported Fee: ₹180.60 (Expected ₹155.40)"],
-        contradictingEvidence: ["No international card metadata cited."],
-        missingInformation: ["Interchange network classification code from gateway nodal file."],
-        recommendedSteps: ["File formal claim with gateway relationship manager citing Schedule B tariff."],
-      },
-      disputeDraft: "DISPUTE CLAIM: OVERCHARGE RECOVERY\nOrder ID: ORD-98422\nDiscrepancy: ₹36.00 excess MDR tariff applied.",
-    },
-    {
-      id: "tx-004",
-      orderId: "ORD-98423",
-      paymentId: "pay_Oz91M205Zaa",
-      gatewayRef: "settle_batch_pending",
-      settlementRef: "UNSETTLED",
-      bankUtr: "PENDING_CREDIT",
-      orderDate: "2026-11-08",
-      shopifyGross: 14200.0,
-      gatewayCapture: 14200.0,
-      mdrFee: 262.7,
-      applicableGst: 47.29,
-      refundsAdjustments: 0.0,
-      settlementNet: 13890.01,
-      bankCredit: 0.0,
-      variance: -13890.01,
-      matchStatus: "LEAKAGE_MISSING_SETTLEMENT",
-      matchingMethod: "Detector 1: Missing Gateway Settlement (T+2 Due Date Exceeded)",
-      ruleVersion: "RULE-2026-V1.2",
-      runId: "RUN-2026-11-12-01",
-      sourceFile: "shopify_orders_nov2026.csv",
-      sourceRow: 215,
-      investigation: {
-        hypotheses: ["Settlement batch release delayed beyond contractual T+2 cutoff."],
-        supportingEvidence: ["Captured on 08 Nov 2026", "RBI clearing completed on 10 Nov 2026"],
-        contradictingEvidence: ["No merchant freeze cited."],
-        missingInformation: ["Gateway batch release log."],
-        recommendedSteps: ["File ticket with payment operations team."],
-      },
-      disputeDraft: "DISPUTE CLAIM: DELAYED SETTLEMENT BATCH\nOrder ID: ORD-98423\nAmount: ₹13,890.01 capture unsettled past contractual T+2 cutoff.",
-    },
-    {
-      id: "tx-005",
-      orderId: "ORD-98424",
-      paymentId: "pay_Oz91M206Cdd",
-      gatewayRef: "settle_batch_90413",
-      settlementRef: "SETL-20261111-01",
-      bankUtr: "HDFCR5202611110099",
-      orderDate: "2026-11-09",
-      shopifyGross: 6200.0,
-      gatewayCapture: 6200.0,
-      mdrFee: 114.7,
-      applicableGst: 20.65,
-      refundsAdjustments: 0.0,
-      settlementNet: 6064.65,
-      bankCredit: 6064.65,
-      variance: 0.0,
-      matchStatus: "MATCHED_PASS_2",
-      matchingMethod: "Pass 2: Exact Settlement ID & Bank UTR Match",
-      ruleVersion: "RULE-2026-V1.2",
-      runId: "RUN-2026-11-12-01",
-      sourceFile: "hdfc_bank_nov2026.csv",
-      sourceRow: 301,
-    },
-    {
-      id: "tx-006",
-      orderId: "ORD-98425",
-      paymentId: "pay_Oz91M207Rtt",
-      gatewayRef: "settle_batch_90413",
-      settlementRef: "SETL-20261111-01",
-      bankUtr: "HDFCR5202611110099",
-      orderDate: "2026-11-09",
-      shopifyGross: 29500.0,
-      gatewayCapture: 29500.0,
-      mdrFee: 545.75,
-      applicableGst: 98.24,
-      refundsAdjustments: 0.0,
-      settlementNet: 28856.01,
-      bankCredit: 28856.01,
-      variance: 0.0,
-      matchStatus: "MATCHED_PASS_1",
-      matchingMethod: "Pass 1: Exact Gateway Payment ID & Order Ref",
-      ruleVersion: "RULE-2026-V1.2",
-      runId: "RUN-2026-11-12-01",
-      sourceFile: "shopify_orders_nov2026.csv",
-      sourceRow: 145,
-    },
-    {
-      id: "tx-007",
-      orderId: "ORD-98426",
-      paymentId: "pay_Oz91M208Faa",
-      gatewayRef: "settle_batch_90414",
-      settlementRef: "SETL-20261111-02",
-      bankUtr: "HDFCR5202611120014",
-      orderDate: "2026-11-10",
-      shopifyGross: 4500.0,
-      gatewayCapture: 4500.0,
-      mdrFee: 83.25,
-      applicableGst: 14.99,
-      refundsAdjustments: 0.0,
-      settlementNet: 4401.76,
-      bankCredit: 4401.76,
-      variance: 0.0,
-      matchStatus: "MATCHED_PASS_4",
-      matchingMethod: "Pass 4: Multi-Factor Candidate Scoring Engine (Score: 0.94)",
-      ruleVersion: "RULE-2026-V1.2",
-      runId: "RUN-2026-11-12-01",
-      sourceFile: "hdfc_bank_nov2026.csv",
-      sourceRow: 412,
-    },
-    {
-      id: "tx-008",
-      orderId: "ORD-98427",
-      paymentId: "pay_Oz91M209Vbb",
-      gatewayRef: "settle_batch_pending",
-      settlementRef: "SETL-UNRESOLVED",
-      bankUtr: "AMBIGUOUS_MATCH",
-      orderDate: "2026-11-11",
-      shopifyGross: 9800.0,
-      gatewayCapture: 9800.0,
-      mdrFee: 181.3,
-      applicableGst: 32.63,
-      refundsAdjustments: 0.0,
-      settlementNet: 9586.07,
-      bankCredit: 9586.07,
-      variance: 0.0,
-      matchStatus: "UNRESOLVED",
-      matchingMethod: "Pass 6: Human Review Queue (Collision score delta < 0.15)",
-      ruleVersion: "RULE-2026-V1.2",
-      runId: "RUN-2026-11-12-01",
-      sourceFile: "shopify_orders_nov2026.csv",
-      sourceRow: 198,
-      investigation: {
-        hypotheses: ["Two identical net amount transactions within the same banking window."],
-        supportingEvidence: ["Credit of ₹9,586.07 received", "Candidate #1: ORD-98427 (Score: 0.88)", "Candidate #2: ORD-98429 (Score: 0.86)"],
-        contradictingEvidence: ["Narration lacks explicit order number token."],
-        missingInformation: ["Original customer card last 4 digits from gateway."],
-        recommendedSteps: ["Require human reviewer manual candidate approval."],
-      },
-    },
-  ];
-
-  // Filtering logic
-  const filteredLedger = useMemo(() => {
-    return rawLedger.filter((item) => {
-      // Search
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matches =
-          item.orderId.toLowerCase().includes(q) ||
-          item.paymentId.toLowerCase().includes(q) ||
-          item.bankUtr.toLowerCase().includes(q) ||
-          item.settlementRef.toLowerCase().includes(q);
-        if (!matches) return false;
+  const fetchRuns = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await ApiClient.listReconciliationRuns();
+      setRuns(res);
+      if (res.length > 0 && !selectedRun) {
+        setSelectedRun(res[0]);
       }
-
-      // Status filter
-      if (statusFilter === "LEAKAGE" && !item.matchStatus.startsWith("LEAKAGE")) return false;
-      if (statusFilter === "MATCHED" && !item.matchStatus.startsWith("MATCHED")) return false;
-      if (statusFilter === "UNRESOLVED" && item.matchStatus !== "UNRESOLVED") return false;
-
-      return true;
-    });
-  }, [searchQuery, statusFilter]);
-
-  const paginatedItems = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredLedger.slice(start, start + pageSize);
-  }, [filteredLedger, page]);
-
-  const totalPages = Math.ceil(filteredLedger.length / pageSize) || 1;
-
-  const handleExportCSV = () => {
-    const headers = [
-      "Order ID",
-      "Order Date",
-      "Payment ID",
-      "Shopify Gross",
-      "Gateway Capture",
-      "MDR Fee",
-      "Applicable GST",
-      "Settlement Net",
-      "Bank Credit",
-      "Variance",
-      "Match Status",
-      "Bank UTR",
-    ];
-    const rows = filteredLedger.map((item) => [
-      item.orderId,
-      item.orderDate,
-      item.paymentId,
-      item.shopifyGross.toFixed(2),
-      item.gatewayCapture.toFixed(2),
-      item.mdrFee.toFixed(2),
-      item.applicableGst.toFixed(2),
-      item.settlementNet.toFixed(2),
-      item.bankCredit.toFixed(2),
-      item.variance.toFixed(2),
-      item.matchStatus,
-      item.bankUtr,
-    ]);
-
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Finora_Reconciliation_Ledger_${new Date().toISOString().substring(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    } catch (err: any) {
+      setError(err.message || "Failed to load reconciliation run history.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  return (
-    <>
-      <Topbar title="Reconciliation Workspace" breadcrumb="Workspace" />
+  useEffect(() => {
+    fetchRuns();
+  }, []);
 
-      <main className="p-6 space-y-4 max-w-7xl mx-auto w-full">
-        {/* Workspace Editorial Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+  const handleTriggerRun = async () => {
+    try {
+      setTriggering(true);
+      const newRun = await ApiClient.triggerReconciliationRun();
+      await fetchRuns();
+      setSelectedRun(newRun);
+    } catch (err: any) {
+      alert("Failed to execute reconciliation run: " + err.message);
+    } finally {
+      setTriggering(false);
+    }
+  };
+
+  const filteredRuns = runs.filter((r) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      r.run_number.toString().includes(q) ||
+      r.id.toLowerCase().includes(q) ||
+      r.status.toLowerCase().includes(q)
+    );
+  });
+
+  return (
+    <div className="flex flex-col min-h-screen bg-canvas">
+      <Topbar
+        title="Reconciliation Run Management"
+        breadcrumb="Workspace"
+        onRunSync={handleTriggerRun}
+      />
+
+      <main className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto w-full">
+        {/* Header & Run Trigger */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-4">
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-ink-primary">
-              Reconciliation
+              Immutable Ledger Run History
             </h1>
-            <p className="text-xs text-ink-secondary mt-1">
-              Trace every rupee across orders, payment gateways, settlements and bank credits.
+            <p className="text-xs text-ink-secondary mt-0.5">
+              Deterministic correlation passes 1 through 6 with superseding allocation versioning
             </p>
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="flex items-center gap-3">
             <Button
-              variant="secondary"
+              onClick={fetchRuns}
+              variant="outline"
               size="sm"
-              onClick={handleExportCSV}
-              className="flex items-center gap-1.5"
+              disabled={loading}
+              className="text-xs font-mono"
             >
-              <Download className="h-3.5 w-3.5 text-ink-secondary" strokeWidth={1.5} />
-              <span>Export Ledger CSV</span>
+              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+            <Button
+              onClick={handleTriggerRun}
+              size="sm"
+              disabled={triggering}
+              className="text-xs font-mono"
+            >
+              <GitCompare className={`h-3.5 w-3.5 mr-1.5 ${triggering ? "animate-spin" : ""}`} />
+              {triggering ? "Running Multi-Pass Engine..." : "Trigger Run N+1"}
             </Button>
           </div>
         </div>
 
-        {/* Filter Toolbar */}
-        <div className="bg-surface border border-border p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
-          {/* Search Box */}
-          <div className="relative flex-1 min-w-[240px] max-w-md">
-            <Search className="h-3.5 w-3.5 text-ink-muted absolute left-2.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search Order ID, Payment ID, UTR, or Batch..."
-              className="w-full pl-8 pr-3 py-1.5 border border-border bg-canvas text-ink-primary text-xs focus:outline-none focus:ring-1 focus:ring-ink-primary placeholder:text-ink-muted font-mono"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink-primary"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
-
-          {/* Filter Dropdowns */}
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Status Selector */}
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-2.5 py-1.5 border border-border bg-surface text-ink-primary text-xs focus:outline-none focus:ring-1 focus:ring-ink-primary font-mono cursor-pointer"
-            >
-              <option value="ALL">ALL MATCH STATUSES</option>
-              <option value="MATCHED">MATCHED ONLY</option>
-              <option value="LEAKAGE">CONFIRMED LEAKAGES</option>
-              <option value="UNRESOLVED">HUMAN REVIEW QUEUE</option>
-            </select>
-
-            {/* Run Selector */}
-            <select
-              value={runSelector}
-              onChange={(e) => setRunSelector(e.target.value)}
-              className="px-2.5 py-1.5 border border-border bg-surface text-ink-primary text-xs focus:outline-none focus:ring-1 focus:ring-ink-primary font-mono cursor-pointer"
-            >
-              <option value="ALL_RUNS">RUN: ALL RUNS</option>
-              <option value="RUN-2026-11-12-01">RUN-2026-11-12-01 (Latest)</option>
-              <option value="RUN-2026-11-11-01">RUN-2026-11-11-01</option>
-            </select>
-
-            {/* Date Range Selector */}
-            <select
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-              className="px-2.5 py-1.5 border border-border bg-surface text-ink-primary text-xs focus:outline-none focus:ring-1 focus:ring-ink-primary font-mono cursor-pointer"
-            >
-              <option value="ALL_TIME">RANGE: CURRENT MONTH</option>
-              <option value="TODAY">TODAY</option>
-              <option value="LAST_7_DAYS">LAST 7 DAYS</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Ledger Summary Stats Bar */}
-        <div className="bg-canvas border border-border px-4 py-2.5 flex items-center justify-between text-xs font-mono text-ink-secondary">
-          <div className="flex items-center gap-4">
-            <span>TOTAL ROWS: <strong className="text-ink-primary">{filteredLedger.length}</strong></span>
-            <span>LEAKAGE COUNT: <strong className="text-[#DC2626]">{filteredLedger.filter(i => i.matchStatus.startsWith("LEAKAGE")).length}</strong></span>
-            <span>HUMAN REVIEW: <strong className="text-[#D97706]">{filteredLedger.filter(i => i.matchStatus === "UNRESOLVED").length}</strong></span>
-          </div>
-          <div className="text-[11px] text-ink-muted">
-            Click any row to open full right-side Audit Dossier
-          </div>
-        </div>
-
-        {/* High-Density Financial Ledger Table (Compact 44px rows) */}
-        <div className="bg-surface border border-border overflow-x-auto shadow-sm">
-          <table className="w-full text-xs text-left border-collapse">
-            <thead>
-              <tr className="border-b border-border bg-canvas/80 text-[11px] font-mono text-ink-muted uppercase select-none">
-                <th className="py-2.5 px-3 font-semibold">1. Order ID</th>
-                <th className="py-2.5 px-3 font-semibold">2. Order Date</th>
-                <th className="py-2.5 px-3 font-semibold text-right">3. Shopify Gross</th>
-                <th className="py-2.5 px-3 font-semibold text-right">4. Gateway Capture</th>
-                <th className="py-2.5 px-3 font-semibold text-right">5. Gateway Fees</th>
-                <th className="py-2.5 px-3 font-semibold text-right">6. Settlement Net</th>
-                <th className="py-2.5 px-3 font-semibold text-right">7. Bank Credit</th>
-                <th className="py-2.5 px-3 font-semibold text-right">8. Variance</th>
-                <th className="py-2.5 px-3 font-semibold text-center">9. Match Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {paginatedItems.length > 0 ? (
-                paginatedItems.map((item) => {
-                  const isLeakage = item.matchStatus.startsWith("LEAKAGE");
-                  const isPending = item.matchStatus === "UNRESOLVED";
-                  const totalGatewayFee = item.mdrFee + item.applicableGst;
-
-                  return (
-                    <tr
-                      key={item.id}
-                      onClick={() => setSelectedItem(item)}
-                      className="hover:bg-hover cursor-pointer transition-colors h-[44px]"
+        {/* Selected Run Deep-Dive Banner */}
+        {selectedRun && (
+          <div className="border border-border bg-surface p-6 space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 border border-border bg-canvas">
+                  <GitCompare className="h-5 w-5 text-ink-primary" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-semibold text-ink-primary">
+                      Run #{selectedRun.run_number}
+                    </h2>
+                    <span className="text-[10px] font-mono text-ink-muted">
+                      ({selectedRun.id})
+                    </span>
+                    <Badge
+                      variant={
+                        selectedRun.status === "COMPLETED"
+                          ? "matched"
+                          : selectedRun.status === "COMPLETED_WITH_EXCEPTIONS"
+                          ? "pending"
+                          : "leakage"
+                      }
                     >
-                      <td className="py-2 px-3 font-mono font-medium text-ink-primary whitespace-nowrap">
-                        {item.orderId}
-                      </td>
-                      <td className="py-2 px-3 text-ink-secondary whitespace-nowrap">
-                        {item.orderDate}
-                      </td>
-                      <td className="py-2 px-3 font-mono text-right tabular-nums text-ink-primary whitespace-nowrap">
-                        {formatINR(item.shopifyGross)}
-                      </td>
-                      <td className="py-2 px-3 font-mono text-right tabular-nums text-ink-primary whitespace-nowrap">
-                        {formatINR(item.gatewayCapture)}
-                      </td>
-                      <td className="py-2 px-3 font-mono text-right tabular-nums text-ink-secondary whitespace-nowrap">
-                        {formatINR(totalGatewayFee)}
-                      </td>
-                      <td className="py-2 px-3 font-mono text-right tabular-nums text-ink-primary whitespace-nowrap">
-                        {formatINR(item.settlementNet)}
-                      </td>
-                      <td className="py-2 px-3 font-mono text-right tabular-nums text-ink-primary whitespace-nowrap">
-                        {formatINR(item.bankCredit)}
-                      </td>
-                      <td
-                        className={`py-2 px-3 font-mono font-semibold text-right tabular-nums whitespace-nowrap ${
-                          item.variance !== 0 ? "text-[#DC2626]" : "text-ink-primary"
+                      {selectedRun.status.replace(/_/g, " ")}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-ink-secondary mt-0.5">
+                    Executed {formatDateTime(selectedRun.created_at)} • Duration:{" "}
+                    {selectedRun.duration_ms ? `${selectedRun.duration_ms}ms` : "—"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-6 text-xs font-mono">
+                <div>
+                  <span className="text-ink-muted block text-[10px] uppercase">Matched Bank</span>
+                  <span className="font-semibold text-ink-primary text-sm">
+                    {formatINR(selectedRun.total_matched_bank_amount)}
+                  </span>
+                </div>
+                <div className="h-8 w-px bg-border" />
+                <div>
+                  <span className="text-ink-muted block text-[10px] uppercase">Discrepancy</span>
+                  <span className="font-semibold text-status-leakage-text text-sm">
+                    {formatINR(selectedRun.total_discrepancy_amount)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Run Quantitative Metrics Breakdown */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
+              <div className="p-3 border border-border bg-canvas space-y-1">
+                <span className="text-[10px] uppercase text-ink-muted block">Orders Matched</span>
+                <div className="text-sm font-semibold text-ink-primary">
+                  {selectedRun.matched_orders_count} / {selectedRun.total_orders_evaluated}
+                </div>
+                <span className="text-[11px] text-ink-secondary">
+                  Total: {formatINR(selectedRun.total_order_amount)}
+                </span>
+              </div>
+
+              <div className="p-3 border border-border bg-canvas space-y-1">
+                <span className="text-[10px] uppercase text-ink-muted block">Payments Matched</span>
+                <div className="text-sm font-semibold text-ink-primary">
+                  {selectedRun.matched_payments_count} / {selectedRun.total_payments_evaluated}
+                </div>
+                <span className="text-[11px] text-ink-secondary">
+                  Captured: {formatINR(selectedRun.total_captured_amount)}
+                </span>
+              </div>
+
+              <div className="p-3 border border-border bg-canvas space-y-1">
+                <span className="text-[10px] uppercase text-ink-muted block">Settlements Matched</span>
+                <div className="text-sm font-semibold text-ink-primary">
+                  {selectedRun.matched_settlements_count} / {selectedRun.total_settlements_evaluated}
+                </div>
+                <span className="text-[11px] text-ink-secondary">
+                  Settled: {formatINR(selectedRun.total_settled_amount)}
+                </span>
+              </div>
+
+              <div className="p-3 border border-border bg-canvas space-y-1">
+                <span className="text-[10px] uppercase text-ink-muted block">Bank Credits Cleared</span>
+                <div className="text-sm font-semibold text-ink-primary">
+                  {selectedRun.matched_bank_txs_count} / {selectedRun.total_bank_transactions_evaluated}
+                </div>
+                <span className="text-[11px] text-ink-secondary">
+                  Fee Drift: {formatINR(selectedRun.total_fee_drift_amount)}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Run History Table */}
+        <div className="border border-border bg-surface p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-mono uppercase tracking-wider text-ink-muted">
+              Historical Execution Runs ({runs.length})
+            </h2>
+
+            <div className="relative max-w-xs">
+              <Search className="h-3.5 w-3.5 absolute left-3 top-2 text-ink-muted" />
+              <input
+                type="text"
+                placeholder="Search runs..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 pr-3 py-1 text-xs bg-canvas border border-border focus:outline-none focus:border-ink-primary font-mono"
+              />
+            </div>
+          </div>
+
+          <div className="border border-border overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-border bg-canvas text-ink-muted font-mono uppercase text-[10px]">
+                  <th className="py-2.5 px-3">Run #</th>
+                  <th className="py-2.5 px-3">Status</th>
+                  <th className="py-2.5 px-3">Timestamp</th>
+                  <th className="py-2.5 px-3 text-right">Orders</th>
+                  <th className="py-2.5 px-3 text-right">Payments</th>
+                  <th className="py-2.5 px-3 text-right">Settled Amount</th>
+                  <th className="py-2.5 px-3 text-right">Matched Bank</th>
+                  <th className="py-2.5 px-3 text-right">Discrepancy</th>
+                  <th className="py-2.5 px-3 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border font-mono">
+                {loading ? (
+                  <tr>
+                    <td colSpan={9} className="py-8 text-center text-ink-muted">
+                      Loading run history...
+                    </td>
+                  </tr>
+                ) : filteredRuns.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="py-8 text-center text-ink-muted">
+                      No reconciliation runs executed yet. Click &quot;Trigger Run N+1&quot; to begin.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredRuns.map((r) => {
+                    const isSelected = selectedRun?.id === r.id;
+                    return (
+                      <tr
+                        key={r.id}
+                        className={`hover:bg-hover transition-colors ${
+                          isSelected ? "bg-canvas font-semibold" : ""
                         }`}
                       >
-                        {formatINR(item.variance)}
-                      </td>
-                      <td className="py-2 px-3 text-center whitespace-nowrap">
-                        <Badge
-                          variant={isLeakage ? "leakage" : isPending ? "pending" : "matched"}
-                        >
-                          {item.matchStatus}
-                        </Badge>
-                      </td>
-                    </tr>
-                  );
-                })
-              ) : (
-                <tr>
-                  <td colSpan={9} className="py-12 text-center text-ink-muted">
-                    <div className="flex flex-col items-center justify-center space-y-2">
-                      <FileSpreadsheet className="h-8 w-8 text-ink-muted" strokeWidth={1.5} />
-                      <p className="text-sm font-medium text-ink-secondary">No financial records match your criteria.</p>
-                      <p className="text-xs text-ink-muted">Try clearing the search query or adjusting the filters.</p>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination Bar */}
-        <div className="flex items-center justify-between pt-2 text-xs text-ink-secondary font-mono">
-          <div>
-            Showing Page <strong className="text-ink-primary">{page}</strong> of <strong className="text-ink-primary">{totalPages}</strong> ({filteredLedger.length} items)
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setPage((p) => Math.max(p - 1, 1))}
-              disabled={page === 1}
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
-              disabled={page === totalPages}
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </Button>
+                        <td className="py-2.5 px-3">
+                          <span className="text-ink-primary font-semibold">#{r.run_number}</span>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <Badge
+                            variant={
+                              r.status === "COMPLETED"
+                                ? "matched"
+                                : r.status === "COMPLETED_WITH_EXCEPTIONS"
+                                ? "pending"
+                                : "leakage"
+                            }
+                          >
+                            {r.status}
+                          </Badge>
+                        </td>
+                        <td className="py-2.5 px-3 text-ink-secondary text-[11px]">
+                          {formatDateTime(r.created_at)}
+                        </td>
+                        <td className="py-2.5 px-3 text-right text-ink-primary">
+                          {r.matched_orders_count}/{r.total_orders_evaluated}
+                        </td>
+                        <td className="py-2.5 px-3 text-right text-ink-primary">
+                          {r.matched_payments_count}/{r.total_payments_evaluated}
+                        </td>
+                        <td className="py-2.5 px-3 text-right text-ink-primary">
+                          {formatINR(r.total_settled_amount)}
+                        </td>
+                        <td className="py-2.5 px-3 text-right text-ink-primary font-medium">
+                          {formatINR(r.total_matched_bank_amount)}
+                        </td>
+                        <td className="py-2.5 px-3 text-right text-status-leakage-text font-semibold">
+                          {formatINR(r.total_discrepancy_amount)}
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <Button
+                            onClick={() => setSelectedRun(r)}
+                            variant="ghost"
+                            size="sm"
+                            className="text-[11px] font-mono h-6 px-2"
+                          >
+                            Inspect
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </main>
-
-      {/* Right-Side Transaction Audit Drawer (Section 6) */}
-      <AuditDrawer
-        item={selectedItem}
-        isOpen={!!selectedItem}
-        onClose={() => setSelectedItem(null)}
-      />
-    </>
+    </div>
   );
 }

@@ -1,6 +1,11 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect } from "react";
+import { Topbar } from "@/components/shell/Topbar";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { formatINR, formatDateTime } from "@/lib/utils";
+import { ApiClient, ReviewQueueItem, ReviewQueueResponse } from "@/lib/api";
 import {
   AlertOctagon,
   Search,
@@ -11,394 +16,446 @@ import {
   Clock,
   ShieldCheck,
   ChevronRight,
-  Download,
+  RefreshCw,
+  X,
+  Layers,
+  ArrowRight,
+  Sliders,
+  DollarSign,
+  AlertTriangle,
 } from "lucide-react";
-import { Topbar } from "@/components/shell/Topbar";
-import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
-import { formatINR, formatDate } from "@/lib/utils";
-import { ConfirmationDialog } from "@/components/ui/ConfirmationDialog";
-import { AuditDrawer, TransactionAuditItem } from "@/components/drawer/AuditDrawer";
 
-interface ExceptionItem {
-  id: string;
-  detectorCategory:
-    | "Missing Gateway Settlement"
-    | "Settlement Not Credited to Bank"
-    | "Contractual Fee Overcharge"
-    | "Duplicate or Unauthorized Refund";
-  sourceRef: string;
-  orderId: string;
-  paymentId: string;
-  discrepancyAmount: number;
-  evidenceStatus: "COMPLETE" | "PENDING_LOGS" | "INSUFFICIENT";
-  investigationStatus:
-    | "Detected"
-    | "Investigating"
-    | "Evidence Pending"
-    | "Potentially Recoverable"
-    | "Verified Recoverable"
-    | "Human Approved"
-    | "Claimed"
-    | "Recovered"
-    | "Dismissed";
-  recoveryClassification: "RECOVERABLE" | "NON_RECOVERABLE" | "UNRESOLVED";
-  lastUpdated: string;
-  auditItem: TransactionAuditItem;
-}
-
-export default function ExceptionsPage() {
-  const [selectedAuditItem, setSelectedAuditItem] = useState<TransactionAuditItem | null>(null);
-  const [activeCategory, setActiveCategory] = useState<string>("ALL");
-  const [activeStatusFilter, setActiveStatusFilter] = useState<string>("ALL");
+export default function ReviewQueuePage() {
+  const [data, setData] = useState<ReviewQueueResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
-  const [reviewModalItem, setReviewModalItem] = useState<ExceptionItem | null>(null);
+  const [selectedItem, setSelectedItem] = useState<ReviewQueueItem | null>(null);
 
-  // Authoritative exception inventory
-  const [exceptions, setExceptions] = useState<ExceptionItem[]>([
-    {
-      id: "EXC-2026-001",
-      detectorCategory: "Contractual Fee Overcharge",
-      sourceRef: "ORD-98422",
-      orderId: "ORD-98422",
-      paymentId: "pay_Oz91M204Kpq",
-      discrepancyAmount: 36.0,
-      evidenceStatus: "COMPLETE",
-      investigationStatus: "Verified Recoverable",
-      recoveryClassification: "RECOVERABLE",
-      lastUpdated: "2026-11-12 01:45 IST",
-      auditItem: {
-        id: "tx-003",
-        orderId: "ORD-98422",
-        paymentId: "pay_Oz91M204Kpq",
-        gatewayRef: "settle_batch_90412",
-        settlementRef: "SETL-20261110-09",
-        bankUtr: "HDFCR5202611110098",
-        orderDate: "2026-11-10",
-        shopifyGross: 8400.0,
-        gatewayCapture: 8400.0,
-        mdrFee: 180.6,
-        applicableGst: 32.51,
-        refundsAdjustments: 0.0,
-        settlementNet: 8186.89,
-        bankCredit: 8150.89,
-        variance: -36.0,
-        matchStatus: "LEAKAGE_OVERCHARGE",
-        matchingMethod: "Pass 3: Contractual Tariff Overcharge Detector",
-        ruleVersion: "RULE-2026-V1.2",
-        runId: "RUN-2026-11-12-01",
-        sourceFile: "razorpay_settlement_nov2026.csv",
-        sourceRow: 89,
-        investigation: {
-          hypotheses: ["Applied 2.15% fee card instead of contractual 1.85% rate."],
-          supportingEvidence: ["Contract Agreement Tariff: Schedule B (1.85% + 18% GST)", "Reported Fee: ₹180.60 (Expected ₹155.40)"],
-          contradictingEvidence: ["No international interchange surcharge cited."],
-          missingInformation: ["Interchange network classification code from gateway nodal file."],
-          recommendedSteps: ["File formal claim with gateway relationship manager citing Schedule B tariff."],
-        },
-        disputeDraft: "DISPUTE CLAIM: OVERCHARGE RECOVERY\nOrder ID: ORD-98422\nDiscrepancy: ₹36.00 excess MDR tariff applied.",
-      },
-    },
-    {
-      id: "EXC-2026-002",
-      detectorCategory: "Missing Gateway Settlement",
-      sourceRef: "ORD-98423",
-      orderId: "ORD-98423",
-      paymentId: "pay_Oz91M205Zaa",
-      discrepancyAmount: 13890.01,
-      evidenceStatus: "COMPLETE",
-      investigationStatus: "Potentially Recoverable",
-      recoveryClassification: "RECOVERABLE",
-      lastUpdated: "2026-11-12 02:10 IST",
-      auditItem: {
-        id: "tx-004",
-        orderId: "ORD-98423",
-        paymentId: "pay_Oz91M205Zaa",
-        gatewayRef: "settle_batch_pending",
-        settlementRef: "UNSETTLED",
-        bankUtr: "PENDING_CREDIT",
-        orderDate: "2026-11-08",
-        shopifyGross: 14200.0,
-        gatewayCapture: 14200.0,
-        mdrFee: 262.7,
-        applicableGst: 47.29,
-        refundsAdjustments: 0.0,
-        settlementNet: 13890.01,
-        bankCredit: 0.0,
-        variance: -13890.01,
-        matchStatus: "LEAKAGE_MISSING_SETTLEMENT",
-        matchingMethod: "Detector 1: Missing Gateway Settlement (T+2 Due Date Exceeded)",
-        ruleVersion: "RULE-2026-V1.2",
-        runId: "RUN-2026-11-12-01",
-        sourceFile: "shopify_orders_nov2026.csv",
-        sourceRow: 215,
-        investigation: {
-          hypotheses: ["Settlement batch release delayed beyond contractual T+2 cutoff."],
-          supportingEvidence: ["Captured on 08 Nov 2026", "RBI clearing completed on 10 Nov 2026"],
-          contradictingEvidence: ["No merchant freeze cited."],
-          missingInformation: ["Gateway batch release log."],
-          recommendedSteps: ["File ticket with payment operations team."],
-        },
-        disputeDraft: "DISPUTE CLAIM: DELAYED SETTLEMENT BATCH\nOrder ID: ORD-98423\nAmount: ₹13,890.01 capture unsettled past contractual T+2 cutoff.",
-      },
-    },
-    {
-      id: "EXC-2026-003",
-      detectorCategory: "Contractual Fee Overcharge",
-      sourceRef: "ORD-98430",
-      orderId: "ORD-98430",
-      paymentId: "pay_Oz91M212Ptt",
-      discrepancyAmount: 54.2,
-      evidenceStatus: "PENDING_LOGS",
-      investigationStatus: "Investigating",
-      recoveryClassification: "UNRESOLVED",
-      lastUpdated: "2026-11-12 02:22 IST",
-      auditItem: {
-        id: "tx-010",
-        orderId: "ORD-98430",
-        paymentId: "pay_Oz91M212Ptt",
-        gatewayRef: "settle_batch_90415",
-        settlementRef: "SETL-20261111-04",
-        bankUtr: "HDFCR5202611120091",
-        orderDate: "2026-11-10",
-        shopifyGross: 18000.0,
-        gatewayCapture: 18000.0,
-        mdrFee: 387.0,
-        applicableGst: 69.66,
-        refundsAdjustments: 0.0,
-        settlementNet: 17543.34,
-        bankCredit: 17489.14,
-        variance: -54.2,
-        matchStatus: "LEAKAGE_OVERCHARGE",
-        matchingMethod: "Pass 3: Contractual Tariff Overcharge Detector",
-        ruleVersion: "RULE-2026-V1.2",
-        runId: "RUN-2026-11-12-01",
-        sourceFile: "razorpay_settlement_nov2026.csv",
-        sourceRow: 114,
-      },
-    },
-  ]);
+  // Review Decision State
+  const [reviewAction, setReviewAction] = useState<"APPROVE" | "REJECT" | "MANUAL_ALLOCATE">("APPROVE");
+  const [reviewNotes, setReviewNotes] = useState("");
+  const [manualAmount, setManualAmount] = useState("");
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string>("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const categories = [
-    "ALL",
-    "Missing Gateway Settlement",
-    "Settlement Not Credited to Bank",
-    "Contractual Fee Overcharge",
-    "Duplicate or Unauthorized Refund",
-  ];
+  // User RBAC
+  const [userRole, setUserRole] = useState<string>("FINANCE_MANAGER");
 
-  const statusFilters = [
-    "ALL",
-    "Detected",
-    "Investigating",
-    "Evidence Pending",
-    "Potentially Recoverable",
-    "Verified Recoverable",
-    "Human Approved",
-    "Claimed",
-    "Recovered",
-    "Dismissed",
-  ];
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const role = localStorage.getItem("finora_active_role") || "FINANCE_MANAGER";
+      setUserRole(role);
+    }
+  }, []);
 
-  const filteredExceptions = useMemo(() => {
-    return exceptions.filter((item) => {
-      if (activeCategory !== "ALL" && item.detectorCategory !== activeCategory) return false;
-      if (activeStatusFilter !== "ALL" && item.investigationStatus !== activeStatusFilter) return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        return (
-          item.id.toLowerCase().includes(q) ||
-          item.sourceRef.toLowerCase().includes(q) ||
-          item.paymentId.toLowerCase().includes(q)
-        );
-      }
-      return true;
-    });
-  }, [exceptions, activeCategory, activeStatusFilter, searchQuery]);
+  const isAuditor = userRole === "AUDITOR";
 
-  const handleApproveException = (reason: string) => {
-    if (!reviewModalItem) return;
-    setExceptions((prev) =>
-      prev.map((item) =>
-        item.id === reviewModalItem.id
-          ? { ...item, investigationStatus: "Human Approved", lastUpdated: "Just now by Human Reviewer" }
-          : item
-      )
-    );
+  const fetchQueue = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await ApiClient.getReviewQueue(statusFilter === "ALL" ? undefined : statusFilter);
+      setData(res);
+    } catch (err: any) {
+      setError(err.message || "Failed to load review queue.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  return (
-    <>
-      <Topbar title="Exception Management" breadcrumb="Investigation" />
+  useEffect(() => {
+    fetchQueue();
+  }, [statusFilter]);
 
-      <main className="p-6 space-y-4 max-w-7xl mx-auto w-full">
-        {/* Editorial Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+  const handleOpenReview = (item: ReviewQueueItem) => {
+    setSelectedItem(item);
+    setReviewAction("APPROVE");
+    setReviewNotes("");
+    setManualAmount(item.discrepancy_amount ? String(item.discrepancy_amount) : "");
+    if (item.candidates && item.candidates.length > 0) {
+      setSelectedCandidateId(item.candidates[0].id);
+    }
+  };
+
+  const handleResolve = async () => {
+    if (!selectedItem) return;
+    if (!reviewNotes.trim()) {
+      alert("A mandatory review rationale must be provided for audit traceability.");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      await ApiClient.resolveMatch(
+        selectedItem.match_id,
+        reviewAction,
+        reviewNotes,
+        selectedCandidateId || undefined,
+        reviewAction === "MANUAL_ALLOCATE" ? manualAmount : undefined
+      );
+      setSelectedItem(null);
+      await fetchQueue();
+    } catch (err: any) {
+      alert("Failed to submit review decision: " + err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const filteredItems = (data?.items || []).filter((item) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      item.match_id.toLowerCase().includes(q) ||
+      item.classification.toLowerCase().includes(q) ||
+      item.explanation.toLowerCase().includes(q)
+    );
+  });
+
+  return (
+    <div className="flex flex-col min-h-screen bg-canvas">
+      <Topbar title="Financial Review Queue" breadcrumb="Investigation" />
+
+      <main className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto w-full">
+        {/* RBAC Banner if Auditor */}
+        {isAuditor && (
+          <div className="p-3 border border-border bg-canvas flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2 text-ink-secondary">
+              <ShieldCheck className="h-4 w-4" />
+              <span>
+                <strong>Auditor Role Detected:</strong> You have read-only inspection access.
+                Decisions must be submitted by Finance Managers or Admins.
+              </span>
+            </div>
+            <span className="font-mono text-[10px] uppercase text-ink-muted">READ ONLY</span>
+          </div>
+        )}
+
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-4">
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-ink-primary">
-              Exception Management
+              Human-in-the-Loop Review Workspace
             </h1>
-            <p className="text-xs text-ink-secondary mt-1">
-              Deterministic revenue leakage exceptions surfaced across the four core financial detectors.
+            <p className="text-xs text-ink-secondary mt-0.5">
+              Review ambiguous correlations, aggregation collisions, unresolved knapsack bounds, and tariff variances
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-mono text-ink-muted">
-              Mandate: Never treat a suspected discrepancy as confirmed loss without evidence.
-            </span>
-          </div>
+
+          <Button
+            onClick={fetchQueue}
+            variant="outline"
+            size="sm"
+            disabled={loading}
+            className="text-xs font-mono"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
+            Refresh Queue
+          </Button>
         </div>
 
-        {/* Detector Category Filter Tabs */}
-        <div className="flex flex-wrap gap-1 border-b border-border pb-2 text-xs">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
-              className={`px-3 py-1.5 font-mono text-[11px] uppercase transition-colors border ${
-                activeCategory === cat
-                  ? "bg-brand-black text-white border-brand-black font-semibold"
-                  : "bg-surface text-ink-secondary border-border hover:bg-hover hover:text-ink-primary"
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
+        {/* Filter Bar */}
+        <div className="border border-border bg-surface p-4 space-y-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="h-4 w-4 absolute left-3 top-2.5 text-ink-muted" />
+              <input
+                type="text"
+                placeholder="Search by match ID, classification, or notes..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-canvas border border-border focus:outline-none focus:border-ink-primary font-mono text-ink-primary"
+              />
+            </div>
 
-        {/* Filter Toolbar */}
-        <div className="bg-surface border border-border p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="relative flex-1 min-w-[240px] max-w-md">
-            <Search className="h-3.5 w-3.5 text-ink-muted absolute left-2.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search Exception ID, Order, or Payment ID..."
-              className="w-full pl-8 pr-3 py-1.5 border border-border bg-canvas text-ink-primary text-xs focus:outline-none focus:ring-1 focus:ring-ink-primary placeholder:text-ink-muted font-mono"
-            />
+            <div className="flex items-center gap-2">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="text-xs bg-canvas border border-border px-3 py-1.5 text-ink-primary font-mono"
+              >
+                <option value="ALL">All Items</option>
+                <option value="PENDING_REVIEW">Pending Review</option>
+                <option value="APPROVED">Approved</option>
+                <option value="REJECTED">Rejected</option>
+                <option value="RESOLVED">Resolved</option>
+              </select>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-mono text-ink-muted uppercase">Lifecycle:</span>
-            <select
-              value={activeStatusFilter}
-              onChange={(e) => setActiveStatusFilter(e.target.value)}
-              className="px-2.5 py-1.5 border border-border bg-surface text-ink-primary text-xs focus:outline-none focus:ring-1 focus:ring-ink-primary font-mono cursor-pointer"
-            >
-              {statusFilters.map((st) => (
-                <option key={st} value={st}>
-                  {st.toUpperCase()}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Exceptions Ledger Table */}
-        <div className="bg-surface border border-border overflow-x-auto shadow-sm">
-          <table className="w-full text-xs text-left border-collapse">
-            <thead>
-              <tr className="border-b border-border bg-canvas/80 text-[11px] font-mono text-ink-muted uppercase select-none">
-                <th className="py-2.5 px-3 font-semibold">Exception ID</th>
-                <th className="py-2.5 px-3 font-semibold">Detector Category</th>
-                <th className="py-2.5 px-3 font-semibold">Source Ref</th>
-                <th className="py-2.5 px-3 font-semibold text-right">Discrepancy</th>
-                <th className="py-2.5 px-3 font-semibold text-center">Evidence</th>
-                <th className="py-2.5 px-3 font-semibold text-center">Status</th>
-                <th className="py-2.5 px-3 font-semibold text-center">Classification</th>
-                <th className="py-2.5 px-3 font-semibold text-right">Last Updated</th>
-                <th className="py-2.5 px-3 font-semibold text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filteredExceptions.map((item) => (
-                <tr
-                  key={item.id}
-                  className="hover:bg-hover/60 transition-colors h-[44px]"
-                >
-                  <td
-                    onClick={() => setSelectedAuditItem(item.auditItem)}
-                    className="py-2 px-3 font-mono font-medium text-ink-primary cursor-pointer hover:underline"
-                  >
-                    {item.id}
-                  </td>
-                  <td className="py-2 px-3 text-ink-secondary">
-                    {item.detectorCategory}
-                  </td>
-                  <td className="py-2 px-3 font-mono text-ink-primary">
-                    {item.sourceRef}
-                  </td>
-                  <td className="py-2 px-3 font-mono font-semibold text-right tabular-nums text-[#DC2626]">
-                    {formatINR(item.discrepancyAmount)}
-                  </td>
-                  <td className="py-2 px-3 text-center">
-                    <Badge variant={item.evidenceStatus === "COMPLETE" ? "matched" : "pending"}>
-                      {item.evidenceStatus}
-                    </Badge>
-                  </td>
-                  <td className="py-2 px-3 text-center">
-                    <Badge
-                      variant={
-                        item.investigationStatus === "Verified Recoverable"
-                          ? "leakage"
-                          : item.investigationStatus === "Human Approved"
-                          ? "matched"
-                          : "pending"
-                      }
-                    >
-                      {item.investigationStatus}
-                    </Badge>
-                  </td>
-                  <td className="py-2 px-3 text-center font-mono text-[11px] text-ink-secondary">
-                    {item.recoveryClassification}
-                  </td>
-                  <td className="py-2 px-3 font-mono text-[11px] text-ink-muted text-right">
-                    {item.lastUpdated}
-                  </td>
-                  <td className="py-2 px-3 text-center">
-                    <div className="flex items-center justify-center gap-1.5">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => setSelectedAuditItem(item.auditItem)}
-                      >
-                        Dossier
-                      </Button>
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={() => setReviewModalItem(item)}
-                        disabled={item.investigationStatus === "Human Approved"}
-                      >
-                        {item.investigationStatus === "Human Approved" ? "Approved" : "Approve"}
-                      </Button>
-                    </div>
-                  </td>
+          {/* Review Queue Table */}
+          <div className="border border-border overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-border bg-canvas text-ink-muted font-mono uppercase text-[10px]">
+                  <th className="py-2.5 px-3">Run</th>
+                  <th className="py-2.5 px-3">Pass</th>
+                  <th className="py-2.5 px-3">Classification</th>
+                  <th className="py-2.5 px-3">Reason / Explanation</th>
+                  <th className="py-2.5 px-3 text-right">Source</th>
+                  <th className="py-2.5 px-3 text-right">Target</th>
+                  <th className="py-2.5 px-3 text-right">Discrepancy</th>
+                  <th className="py-2.5 px-3 text-center">Status</th>
+                  <th className="py-2.5 px-3 text-center">Action</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-border font-mono">
+                {loading ? (
+                  <tr>
+                    <td colSpan={9} className="py-8 text-center text-ink-muted">
+                      Querying pending review items...
+                    </td>
+                  </tr>
+                ) : filteredItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="py-8 text-center text-ink-muted">
+                      No review queue items pending. All matches resolved or approved.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredItems.map((item) => (
+                    <tr key={item.match_id} className="hover:bg-hover transition-colors">
+                      <td className="py-2.5 px-3 text-ink-primary font-semibold">
+                        #{item.run_number}
+                      </td>
+                      <td className="py-2.5 px-3 text-ink-secondary">Pass {item.pass_number}</td>
+                      <td className="py-2.5 px-3 font-semibold text-ink-primary">
+                        {item.classification.replace(/_/g, " ")}
+                      </td>
+                      <td className="py-2.5 px-3 text-ink-secondary max-w-xs truncate font-sans">
+                        {item.explanation}
+                      </td>
+                      <td className="py-2.5 px-3 text-right text-ink-primary">
+                        {formatINR(item.source_amount)}
+                      </td>
+                      <td className="py-2.5 px-3 text-right text-ink-primary">
+                        {formatINR(item.target_amount)}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-semibold text-status-leakage-text">
+                        {formatINR(item.discrepancy_amount)}
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <Badge
+                          variant={
+                            item.review_status === "APPROVED" || item.review_status === "RESOLVED"
+                              ? "matched"
+                              : item.review_status === "REJECTED"
+                              ? "leakage"
+                              : "pending"
+                          }
+                        >
+                          {item.review_status.replace(/_/g, " ")}
+                        </Badge>
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <Button
+                          onClick={() => handleOpenReview(item)}
+                          variant="outline"
+                          size="sm"
+                          className="text-[11px] font-mono h-6 px-2.5"
+                        >
+                          Review
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </main>
 
-      {/* Audit Drawer */}
-      <AuditDrawer
-        item={selectedAuditItem}
-        isOpen={!!selectedAuditItem}
-        onClose={() => setSelectedAuditItem(null)}
-      />
+      {/* Decision Review Modal */}
+      {selectedItem && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl bg-surface border border-border p-6 shadow-xl space-y-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div>
+                <span className="text-[10px] font-mono uppercase text-ink-muted">
+                  FINANCIAL REVIEW DECISION
+                </span>
+                <h3 className="text-base font-semibold text-ink-primary">
+                  {selectedItem.classification.replace(/_/g, " ")} (Pass {selectedItem.pass_number})
+                </h3>
+              </div>
+              <button
+                onClick={() => setSelectedItem(null)}
+                className="p-1 hover:bg-hover border border-border"
+              >
+                <X className="h-4 w-4 text-ink-secondary" />
+              </button>
+            </div>
 
-      {/* Human Review Confirmation Dialog */}
-      <ConfirmationDialog
-        isOpen={!!reviewModalItem}
-        onClose={() => setReviewModalItem(null)}
-        onConfirm={handleApproveException}
-        title={`Approve Recovery Claim: ${reviewModalItem?.id}`}
-        description={`You are formally approving ${formatINR(reviewModalItem?.discrepancyAmount || 0)} as a verified recoverable revenue loss under ${reviewModalItem?.detectorCategory}. This action produces an immutable audit log entry.`}
-        confirmLabel="Authorize Recovery Claim"
-        severity="critical"
-      />
-    </>
+            {/* Evidence & Explanation Box */}
+            <div className="p-4 border border-border bg-canvas space-y-3 text-xs font-mono">
+              <div className="flex justify-between">
+                <span className="text-ink-muted">Explanation:</span>
+                <span className="text-ink-primary font-medium text-right max-w-md font-sans">
+                  {selectedItem.explanation}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-3 pt-2 border-t border-border">
+                <div>
+                  <span className="text-[10px] text-ink-muted block">SOURCE AMOUNT</span>
+                  <span className="text-sm font-semibold text-ink-primary">
+                    {formatINR(selectedItem.source_amount)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-ink-muted block">TARGET AMOUNT</span>
+                  <span className="text-sm font-semibold text-ink-primary">
+                    {formatINR(selectedItem.target_amount)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-ink-muted block">DISCREPANCY</span>
+                  <span className="text-sm font-semibold text-status-leakage-text">
+                    {formatINR(selectedItem.discrepancy_amount)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* If Candidates exist (Knapsack or Ambiguous Collision) */}
+            {selectedItem.candidates && selectedItem.candidates.length > 0 && (
+              <div className="space-y-2 text-xs font-mono">
+                <span className="text-[10px] font-mono uppercase text-ink-muted block">
+                  Competing Candidates ({selectedItem.candidates.length})
+                </span>
+                <div className="border border-border divide-y divide-border bg-canvas">
+                  {selectedItem.candidates.map((c) => (
+                    <label
+                      key={c.id}
+                      className="p-3 flex items-center justify-between cursor-pointer hover:bg-hover"
+                    >
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="radio"
+                          name="candidateSelection"
+                          value={c.id}
+                          checked={selectedCandidateId === c.id}
+                          onChange={() => setSelectedCandidateId(c.id)}
+                          disabled={isAuditor}
+                        />
+                        <div>
+                          <div className="font-semibold text-ink-primary">{c.reference}</div>
+                          {c.date && <div className="text-[10px] text-ink-muted">{c.date}</div>}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold text-ink-primary">{formatINR(c.amount)}</div>
+                        {c.score && (
+                          <div className="text-[10px] text-ink-secondary">Score: {c.score}</div>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Decision Input Controls */}
+            {!isAuditor ? (
+              <div className="space-y-4 pt-2 border-t border-border">
+                <div className="space-y-2">
+                  <label className="text-xs font-mono text-ink-primary block uppercase">
+                    Select Decision Action
+                  </label>
+                  <div className="grid grid-cols-3 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setReviewAction("APPROVE")}
+                      className={`p-2.5 text-xs font-mono border text-center transition-colors ${
+                        reviewAction === "APPROVE"
+                          ? "border-ink-primary bg-ink-primary text-white"
+                          : "border-border bg-surface text-ink-primary hover:bg-hover"
+                      }`}
+                    >
+                      Approve Match
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReviewAction("REJECT")}
+                      className={`p-2.5 text-xs font-mono border text-center transition-colors ${
+                        reviewAction === "REJECT"
+                          ? "border-status-leakage-text bg-status-leakage-bg text-status-leakage-text font-semibold"
+                          : "border-border bg-surface text-ink-primary hover:bg-hover"
+                      }`}
+                    >
+                      Reject Match
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReviewAction("MANUAL_ALLOCATE")}
+                      className={`p-2.5 text-xs font-mono border text-center transition-colors ${
+                        reviewAction === "MANUAL_ALLOCATE"
+                          ? "border-status-pending-text bg-status-pending-bg text-status-pending-text font-semibold"
+                          : "border-border bg-surface text-ink-primary hover:bg-hover"
+                      }`}
+                    >
+                      Manual Allocate
+                    </button>
+                  </div>
+                </div>
+
+                {reviewAction === "MANUAL_ALLOCATE" && (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-mono text-ink-muted uppercase block">
+                      Manual Allocation Amount (₹)
+                    </label>
+                    <input
+                      type="text"
+                      value={manualAmount}
+                      onChange={(e) => setManualAmount(e.target.value)}
+                      placeholder="e.g. 5000.0000"
+                      className="w-full px-3 py-1.5 text-xs bg-canvas border border-border font-mono text-ink-primary"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono text-ink-muted uppercase block">
+                    Mandatory Review Rationale (Auditable Evidence Note) *
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={reviewNotes}
+                    onChange={(e) => setReviewNotes(e.target.value)}
+                    placeholder="State justification, ledger ticket reference, or reason for decision..."
+                    className="w-full p-2.5 text-xs bg-canvas border border-border font-sans text-ink-primary focus:outline-none focus:border-ink-primary"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <Button
+                    onClick={() => setSelectedItem(null)}
+                    variant="outline"
+                    size="sm"
+                    className="text-xs font-mono"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleResolve}
+                    size="sm"
+                    disabled={submitting}
+                    className="text-xs font-mono"
+                  >
+                    {submitting ? "Registering Decision..." : "Submit Review Decision"}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 border border-border bg-canvas text-center text-xs text-ink-secondary">
+                Review decision submission is disabled for Auditor accounts.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

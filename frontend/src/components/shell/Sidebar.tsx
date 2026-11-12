@@ -58,32 +58,22 @@ export function Sidebar({
       items: [
         { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
         { name: "Reconciliation", href: "/dashboard/reconciliation", icon: GitCompare },
+        { name: "Leakage Detection", href: "/dashboard/leakage-detection", icon: Radar },
+        { name: "Review Queue", href: "/dashboard/exceptions", icon: AlertOctagon },
         { name: "Transactions", href: "/dashboard/transactions", icon: ArrowLeftRight },
+      ],
+    },
+    {
+      group: "FINANCIAL INTELLIGENCE",
+      items: [
+        { name: "Fee Contracts", href: "/dashboard/contracts", icon: FileCheck2 },
+        { name: "AI Investigations", href: "/dashboard/investigations", icon: Sparkles },
         { name: "Settlements", href: "/dashboard/settlements", icon: Landmark },
       ],
     },
     {
-      group: "INVESTIGATION",
+      group: "GOVERNANCE",
       items: [
-        { name: "Exceptions", href: "/dashboard/exceptions", icon: AlertOctagon },
-        { name: "Leakage Detection", href: "/dashboard/leakage-detection", icon: Radar },
-        { name: "AI Investigations", href: "/dashboard/investigations", icon: Sparkles },
-        { name: "Dispute Management", href: "/dashboard/disputes", icon: FileSpreadsheet },
-      ],
-    },
-    {
-      group: "DATA",
-      items: [
-        { name: "Data Sources", href: "/dashboard/data-sources", icon: Database },
-        { name: "Upload History", href: "/dashboard/upload-history", icon: FileClock },
-        { name: "Fee Contracts", href: "/dashboard/contracts", icon: FileCheck2 },
-        { name: "Reports", href: "/dashboard/reports", icon: FileText },
-      ],
-    },
-    {
-      group: "ADMINISTRATION",
-      items: [
-        { name: "Team & Access", href: "/dashboard/team", icon: Users },
         { name: "Audit Logs", href: "/dashboard/audit", icon: ScrollText },
         { name: "Settings", href: "/dashboard/settings", icon: Sliders },
       ],

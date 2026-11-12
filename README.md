@@ -8,7 +8,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-14.2%20(Port%203100)-black?logo=next.js&logoColor=white)](https://nextjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%20(NUMERIC_18%2C4)-336791?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-7.0%20(RQ%20Worker)-DC382D?logo=redis&logoColor=white)](https://redis.io/)
-[![Testing](https://img.shields.io/badge/Pytest-171%2F171%20Passed%20(100%25)-brightgreen?logo=pytest&logoColor=white)](https://docs.pytest.org/)
+[![Testing](https://img.shields.io/badge/Pytest-175%2F175%20Passed%20(100%25)-brightgreen?logo=pytest&logoColor=white)](https://docs.pytest.org/)
 [![Architecture](https://img.shields.io/badge/Architecture-Modular%20Monolith-purple)](#system-architecture)
 
 **Enterprise-grade three-way financial ledger matching, contractual tariff overcharge detection, and AI-assisted dispute claim generation for Indian mid-sized D2C and e-commerce enterprises.**
@@ -319,11 +319,12 @@ cd backend
 pytest -v
 ```
 
-### Verified Test Suite Breakdown (171/171 Passing — 100% Pass Rate)
+### Verified Test Suite Breakdown (175/175 Passing — 100% Pass Rate)
 
 | Test Module | Coverage Area | Status |
 |---|---|---|
 | `test_auth.py` | Registration, duplicate slug rejection, JWT issuance, profile lookup (6 tests) | **PASSED** |
+| `test_dashboard_api.py` | Executive overview metrics, 3-way flow, leakage findings, review queue, fee analytics, audit logs, tenant isolation (4 tests) | **PASSED** |
 | `test_health.py` | Root and `/api/v1` healthcheck probes (2 tests) | **PASSED** |
 | `test_ingestion_hdfc.py` | HDFC Bank CSV parsing, date normalization, running balance verification (1 test) | **PASSED** |
 | `test_ingestion_razorpay.py` | Razorpay payment captures, settlement batches, duplicate isolation (3 tests) | **PASSED** |
@@ -358,7 +359,7 @@ pytest -v
 ```
 ============================== test session summary ==============================
 Platform: win32 | Python: 3.12/3.14 | Pytest: 9.1.1 | Hypothesis: 6.170.15
-171 passed, 10 warnings in 98.30s (100% pass rate)
+175 passed, 10 warnings in 102.15s (100% pass rate)
 ===================================================================================
 ```
 
@@ -407,6 +408,7 @@ Comprehensive architectural specifications and formal audit reports are located 
 | [**18. Phase 4 Group A2 Lineage & Evidence**](./docs/17_phase_4_group_a2_implementation_report.md) | Group A2 immutable run snapshots, evidence fingerprinting, and lineage protection. |
 | [**19. Phase 4 Group A2.1 Retention Report**](./docs/18_phase_4_group_a2_1_financial_history_retention_report.md) | Group A2.1 tenant financial history retention, soft delete, and fail-closed migrations. |
 | [**20. Phase 5 AI Forensic Investigator**](./docs/19_phase_5_ai_forensic_investigator_implementation_report.md) | Phase 5 read-only evidence-based AI root cause analysis, confidence scoring, and claim drafts. |
+| [**21. Phase 6 Dashboard Report**](./docs/20_phase_6_dashboard_implementation_report.md) | Phase 6 financial review dashboard architecture, leakage analytics, review queue, and verification. |
 
 ---
 
