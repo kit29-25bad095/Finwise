@@ -1,12 +1,12 @@
 import uuid
 from decimal import Decimal
 from typing import List, TYPE_CHECKING
-from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, UniqueConstraint, Uuid
+from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, UniqueConstraint, Uuid, event
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 from app.core.rbac import Role
-from app.models.base import TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.base import TimestampMixin, UUIDPrimaryKeyMixin, ImmutabilityViolationError
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -72,3 +72,12 @@ class TenantMembership(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     def __repr__(self) -> str:
         return f"<TenantMembership user={self.user_id} tenant={self.tenant_id} role={self.role}>"
+
+
+def _prevent_tenant_delete(mapper, connection, target):
+    raise ImmutabilityViolationError(
+        f"Hard deletion of Tenant '{target.id}' ({target.slug}) is strictly prohibited to preserve historical financial and audit records. Use soft deactivation (is_active=False) instead."
+    )
+
+
+event.listen(Tenant, "before_delete", _prevent_tenant_delete)

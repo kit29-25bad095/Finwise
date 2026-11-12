@@ -77,7 +77,7 @@ class FeeContract(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     tenant_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("tenants.id", ondelete="CASCADE"),
+        ForeignKey("tenants.id", ondelete="RESTRICT"),
         nullable=False,
         index=True
     )
@@ -122,7 +122,7 @@ class FeeScheduleTier(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     tenant_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("tenants.id", ondelete="CASCADE"),
+        ForeignKey("tenants.id", ondelete="RESTRICT"),
         nullable=False,
         index=True
     )
@@ -153,7 +153,7 @@ class ReconciliationRun(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     tenant_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("tenants.id", ondelete="CASCADE"),
+        ForeignKey("tenants.id", ondelete="RESTRICT"),
         nullable=False,
         index=True
     )
@@ -233,7 +233,7 @@ class ReconciliationMatch(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     tenant_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("tenants.id", ondelete="CASCADE"),
+        ForeignKey("tenants.id", ondelete="RESTRICT"),
         nullable=False,
         index=True
     )
@@ -333,7 +333,7 @@ class ReconciliationAllocation(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     tenant_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("tenants.id", ondelete="CASCADE"),
+        ForeignKey("tenants.id", ondelete="RESTRICT"),
         nullable=False,
         index=True
     )
@@ -383,7 +383,7 @@ class ReconciliationRunDelta(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     tenant_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("tenants.id", ondelete="CASCADE"),
+        ForeignKey("tenants.id", ondelete="RESTRICT"),
         nullable=False,
         index=True
     )

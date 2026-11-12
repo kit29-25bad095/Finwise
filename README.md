@@ -8,7 +8,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-14.2%20(Port%203100)-black?logo=next.js&logoColor=white)](https://nextjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%20(NUMERIC_18%2C4)-336791?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-7.0%20(RQ%20Worker)-DC382D?logo=redis&logoColor=white)](https://redis.io/)
-[![Testing](https://img.shields.io/badge/Pytest-49%2F49%20Passed%20(100%25)-brightgreen?logo=pytest&logoColor=white)](https://docs.pytest.org/)
+[![Testing](https://img.shields.io/badge/Pytest-171%2F171%20Passed%20(100%25)-brightgreen?logo=pytest&logoColor=white)](https://docs.pytest.org/)
 [![Architecture](https://img.shields.io/badge/Architecture-Modular%20Monolith-purple)](#system-architecture)
 
 **Enterprise-grade three-way financial ledger matching, contractual tariff overcharge detection, and AI-assisted dispute claim generation for Indian mid-sized D2C and e-commerce enterprises.**
@@ -319,7 +319,7 @@ cd backend
 pytest -v
 ```
 
-### Verified Test Suite Breakdown (49/49 Passing — 100% Pass Rate)
+### Verified Test Suite Breakdown (171/171 Passing — 100% Pass Rate)
 
 | Test Module | Coverage Area | Status |
 |---|---|---|
@@ -336,11 +336,29 @@ pytest -v
 | `test_reconciliation_property_based.py` | Hypothesis property-based testing of staged rounding, tenant isolation, idempotent re-runs (3 tests) | **PASSED** |
 | `test_reconciliation_settlement_to_bank.py` | Pass 2 exact UTR matching, Pass 3 collision guards, Pass 5 bounded knapsack subset-sum, never-force-match guarantee (4 tests) | **PASSED** |
 | `test_tenant_isolation.py` | Multi-tenant cryptographic isolation, foreign tenant access rejection (5 tests) | **PASSED** |
+| `test_leakage_detector_fee_overcharge.py` | Phase 4 Fee Overcharge Detector, MDR contract verification, GST variance, and precision (10 tests) | **PASSED** |
+| `test_leakage_detector_missing_settlement.py` | Phase 4 Missing Settlement Detector, settlement SLAs, captured payment tracking (8 tests) | **PASSED** |
+| `test_leakage_detector_uncredited_settlement.py` | Phase 4 Uncredited Settlement Detector, bank nodal account clearing, UTR verification (8 tests) | **PASSED** |
+| `test_leakage_detector_refund_anomalies.py` | Phase 4 Refund Anomaly Detector, duplicate refunds, orphaned refunds, negative balance (8 tests) | **PASSED** |
+| `test_leakage_detector_calendar_and_timezone.py` | Phase 4 Banking calendar (RBI holidays, 2nd/4th Saturdays) and IST timezone conversion (11 tests) | **PASSED** |
+| `test_leakage_orchestration_and_idempotency.py` | Phase 4 Detector orchestration, pipeline chaining, and idempotent re-runs (6 tests) | **PASSED** |
+| `test_leakage_lineage_and_evidence.py` | Group A2 Immutable run snapshots, SHA-256 evidence fingerprinting, and run lineage (16 tests) | **PASSED** |
+| `test_leakage_api_and_rbac.py` | Phase 4 API endpoints, tenant filtering, RBAC review actions, audit trails (11 tests) | **PASSED** |
+| `test_tenant_financial_history_retention.py` | Group A2.1 Tenant financial history retention, soft delete protection, fail-closed downgrade (9 tests) | **PASSED** |
+| `test_forensic_reader.py` | Phase 5 Read-only forensic data extraction, strictly bounded financial data retrieval (7 tests) | **PASSED** |
+| `test_forensic_evidence.py` | Phase 5 Deterministic evidence pack compilation, SHA-256 integrity verification (6 tests) | **PASSED** |
+| `test_forensic_investigation.py` | Phase 5 Orchestration of forensic analysis, state transitions, and idempotency (8 tests) | **PASSED** |
+| `test_forensic_confidence.py` | Phase 5 Mathematical confidence scoring engine, deterministic penalty deductions (7 tests) | **PASSED** |
+| `test_forensic_llm_adapter.py` | Phase 5 Multi-provider LLM adapter (Gemini, Claude, GPT-4, Mock), structured output (4 tests) | **PASSED** |
+| `test_forensic_claim_drafts.py` | Phase 5 Dispute claim generation, portal formatting, human-in-the-loop review (4 tests) | **PASSED** |
+| `test_forensic_security.py` | Phase 5 Authority isolation, read-only guarantees, PII sanitization, anti-hallucination (3 tests) | **PASSED** |
+| `test_forensic_api_rbac.py` | Phase 5 REST endpoints, role permissions, tenant isolation, human approval gates (2 tests) | **PASSED** |
+| `test_alembic_version_length_compatibility.py` | Alembic PostgreSQL VARCHAR(128) version table compatibility, multi-step migration (5 tests) | **PASSED** |
 
 ```
 ============================== test session summary ==============================
-Platform: win32 | Python: 3.14.6 | Pytest: 9.1.1 | Hypothesis: 6.170.15
-49 passed in 14.31s (100% pass rate)
+Platform: win32 | Python: 3.12/3.14 | Pytest: 9.1.1 | Hypothesis: 6.170.15
+171 passed, 10 warnings in 98.30s (100% pass rate)
 ===================================================================================
 ```
 
@@ -385,6 +403,10 @@ Comprehensive architectural specifications and formal audit reports are located 
 | [**14. Phase 2 Ingestion Report**](./docs/13_phase_2_ingestion_implementation_report.md) | Phase 2 CSV ingestion pipeline, adapters, sanitization, and verification. |
 | [**15. Phase 3 Reconciliation Report**](./docs/14_phase_3_reconciliation_implementation_report.md) | Phase 3 deterministic 3-way matching engine, knapsack solver, and fee engine. |
 | [**16. Phase 3 Financial Integrity Audit**](./docs/15_phase_3_final_financial_integrity_audit.md) | Independent audit verifying balance conservation, bounds, immutability, and security. |
+| [**17. Phase 4 Leakage Detection Report**](./docs/16_phase_4_leakage_detection_implementation_report.md) | Phase 4 deterministic revenue leakage detection engine, 4 core detectors, and scheduler. |
+| [**18. Phase 4 Group A2 Lineage & Evidence**](./docs/17_phase_4_group_a2_implementation_report.md) | Group A2 immutable run snapshots, evidence fingerprinting, and lineage protection. |
+| [**19. Phase 4 Group A2.1 Retention Report**](./docs/18_phase_4_group_a2_1_financial_history_retention_report.md) | Group A2.1 tenant financial history retention, soft delete, and fail-closed migrations. |
+| [**20. Phase 5 AI Forensic Investigator**](./docs/19_phase_5_ai_forensic_investigator_implementation_report.md) | Phase 5 read-only evidence-based AI root cause analysis, confidence scoring, and claim drafts. |
 
 ---
 

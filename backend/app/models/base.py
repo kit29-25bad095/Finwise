@@ -31,3 +31,8 @@ class UUIDPrimaryKeyMixin:
         default=uuid.uuid4,
         nullable=False
     )
+
+
+class ImmutabilityViolationError(RuntimeError):
+    """Raised when an update or delete is attempted on an immutable audit record or protected entity."""
+    pass

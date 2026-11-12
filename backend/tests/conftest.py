@@ -3,7 +3,7 @@ import uuid
 import pytest
 from typing import Generator
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -24,6 +24,8 @@ import app.models  # ensure models are registered
 from app.main import app as fastapi_app
 import app.workers.ingestion_tasks
 import app.workers.reconciliation_tasks
+import app.workers.leakage_tasks
+import app.workers.forensic_tasks
 
 test_engine = create_engine(
     "sqlite://",
@@ -31,6 +33,13 @@ test_engine = create_engine(
     connect_args={"check_same_thread": False},
     poolclass=StaticPool,
 )
+
+@event.listens_for(test_engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+
 
 TestSessionLocal = sessionmaker(
     bind=test_engine,
@@ -42,6 +51,8 @@ app.core.database.engine = test_engine
 app.core.database.SessionLocal = TestSessionLocal
 app.workers.ingestion_tasks.SessionLocal = TestSessionLocal
 app.workers.reconciliation_tasks.SessionLocal = TestSessionLocal
+app.workers.leakage_tasks.SessionLocal = TestSessionLocal
+app.workers.forensic_tasks.SessionLocal = TestSessionLocal
 
 
 @pytest.fixture(autouse=True)

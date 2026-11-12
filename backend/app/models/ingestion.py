@@ -43,7 +43,7 @@ class IngestionBatch(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     tenant_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("tenants.id", ondelete="CASCADE"),
+        ForeignKey("tenants.id", ondelete="RESTRICT"),
         nullable=False,
         index=True
     )
@@ -89,7 +89,7 @@ class SourceRowError(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     tenant_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("tenants.id", ondelete="CASCADE"),
+        ForeignKey("tenants.id", ondelete="RESTRICT"),
         nullable=False,
         index=True
     )

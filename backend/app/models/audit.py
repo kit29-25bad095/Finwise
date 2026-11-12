@@ -13,7 +13,7 @@ class AuditLog(Base, UUIDPrimaryKeyMixin):
 
     tenant_id: Mapped[uuid.UUID] = mapped_column(
         Uuid,
-        ForeignKey("tenants.id", ondelete="CASCADE"),
+        ForeignKey("tenants.id", ondelete="RESTRICT"),
         nullable=False,
         index=True
     )

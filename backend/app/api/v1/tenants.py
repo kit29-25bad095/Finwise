@@ -79,6 +79,29 @@ def update_tenant_settings(
     )
 
 
+@router.delete("/{tenant_id}", response_model=TenantRead)
+def deactivate_tenant(
+    tenant_id: uuid.UUID,
+    request: Request,
+    membership: TenantMembership = Depends(RoleChecker([Role.ADMIN])),
+    session: Session = Depends(get_db_session)
+):
+    if membership.tenant_id != tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied to tenant environment."
+        )
+
+    client_ip = request.client.host if request.client else None
+    return TenantService.deactivate_tenant(
+        session=session,
+        tenant_id=tenant_id,
+        performed_by_id=membership.user_id,
+        user_rationale="Soft-deactivation requested via API",
+        ip_address=client_ip
+    )
+
+
 @router.post("/{tenant_id}/members", response_model=TenantMembershipRead, status_code=status.HTTP_201_CREATED)
 def add_tenant_member(
     tenant_id: uuid.UUID,

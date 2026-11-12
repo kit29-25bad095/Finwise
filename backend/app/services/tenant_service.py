@@ -139,3 +139,38 @@ class TenantService:
         session.commit()
         session.refresh(tenant)
         return tenant
+
+    @staticmethod
+    def deactivate_tenant(
+        session: Session,
+        tenant_id: uuid.UUID,
+        performed_by_id: uuid.UUID,
+        user_rationale: Optional[str] = "Tenant deactivated",
+        ip_address: Optional[str] = None
+    ) -> Tenant:
+        stmt = select(Tenant).where(Tenant.id == tenant_id)
+        tenant = session.execute(stmt).scalar_one_or_none()
+        if not tenant:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Tenant not found."
+            )
+        if not tenant.is_active:
+            return tenant
+
+        tenant.is_active = False
+        audit = AuditLog(
+            tenant_id=tenant_id,
+            user_id=performed_by_id,
+            action="TENANT_DEACTIVATED",
+            target_entity_type="tenant",
+            target_entity_id=tenant.id,
+            previous_state={"is_active": True},
+            new_state={"is_active": False},
+            user_rationale=user_rationale,
+            ip_address=ip_address
+        )
+        session.add(audit)
+        session.commit()
+        session.refresh(tenant)
+        return tenant

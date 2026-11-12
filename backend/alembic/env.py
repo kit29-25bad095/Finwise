@@ -11,6 +11,14 @@ if str(backend_dir) not in sys.path:
 
 from app.core.config import settings
 from app.models import Base
+from app.core.alembic_utils import patch_alembic_version_table, ensure_version_column_capacity
+
+# ---------------------------------------------------------------------------
+# Alembic Version Table Capacity Configuration
+# ---------------------------------------------------------------------------
+# Widen alembic_version.version_num to VARCHAR(128) across all dialects to safely
+# store long descriptive revision IDs (006 is 38 chars, 007 is 34 chars) on PostgreSQL.
+patch_alembic_version_table(length=128)
 
 config = context.config
 
@@ -44,6 +52,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        ensure_version_column_capacity(connection, length=128)
         context.configure(
             connection=connection,
             target_metadata=target_metadata,

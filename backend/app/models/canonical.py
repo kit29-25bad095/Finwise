@@ -27,7 +27,7 @@ class CanonicalOrder(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     tenant_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("tenants.id", ondelete="CASCADE"),
+        ForeignKey("tenants.id", ondelete="RESTRICT"),
         nullable=False,
         index=True
     )
@@ -73,7 +73,7 @@ class CanonicalPayment(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     tenant_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("tenants.id", ondelete="CASCADE"),
+        ForeignKey("tenants.id", ondelete="RESTRICT"),
         nullable=False,
         index=True
     )
@@ -120,7 +120,7 @@ class CanonicalSettlement(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     tenant_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("tenants.id", ondelete="CASCADE"),
+        ForeignKey("tenants.id", ondelete="RESTRICT"),
         nullable=False,
         index=True
     )
@@ -163,7 +163,7 @@ class CanonicalRefund(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     tenant_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("tenants.id", ondelete="CASCADE"),
+        ForeignKey("tenants.id", ondelete="RESTRICT"),
         nullable=False,
         index=True
     )
@@ -189,7 +189,7 @@ class CanonicalRefund(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     __table_args__ = (
         Index("ix_refunds_tenant_refid", "tenant_id", "gateway_refund_id"),
-        UniqueConstraint("tenant_id", "gateway_refund_id", name="uq_tenant_gateway_refund_id"),
+        # Relaxed in Phase 4: UniqueConstraint prevented importing lifecycle retry attempts and detecting duplicate gateway refunds.
     )
 
 
@@ -201,7 +201,7 @@ class CanonicalBankTransaction(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     tenant_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("tenants.id", ondelete="CASCADE"),
+        ForeignKey("tenants.id", ondelete="RESTRICT"),
         nullable=False,
         index=True
     )
