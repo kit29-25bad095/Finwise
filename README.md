@@ -404,11 +404,12 @@ pytest -v
 | `test_phase7_financial_integrity.py` | Phase 7 dynamic non-hardcoded GST rates (0%, 5%), balance conservation, decimal precision, knapsack boundaries (5 tests) | **PASSED** |
 | `test_phase7_blind_holdout_benchmark.py` | Phase 7 500-scenario independent synthetic holdout benchmark evaluation (1 test) | **PASSED** |
 | `test_phase7_backup_restore.py` | Phase 7 live database snapshot, disaster recovery drill, cryptographic checksum verification (2 tests) | **PASSED** |
+| `test_gemini_integration.py` | Google Gemini 2.0 API integration, rate limits, timeouts, anti-hallucination citation filtering, dashboard state (9 tests passed, 1 live test gated on live key) | **PASSED** |
 
 ```
 ============================== test session summary ==============================
 Platform: win32 | Python: 3.12/3.14 | Pytest: 9.1.1 | Hypothesis: 6.170.15
-193 passed, 9 warnings in 45.77s (100% pass rate)
+202 passed, 1 skipped, 10 warnings in 48.24s (100% pass rate)
 ===================================================================================
 ```
 
@@ -468,6 +469,7 @@ Comprehensive architectural specifications and formal audit reports are located 
 | [**25. Phase 7 Production Deployment Guide**](./docs/19_production_deployment_guide.md) | Production topology, environment variable references, and multi-container Docker compose runbooks. |
 | [**26. Phase 7 Pilot Operations Manual**](./docs/20_pilot_operations_manual.md) | Merchant onboarding, daily reconciliation SOP, human review protocols, and retention policies. |
 | [**27. Phase 7 Final Release Readiness**](./docs/21_final_release_readiness_report.md) | Final release readiness report with measurable acceptance criteria and PILOT READY verdict. |
+| [**28. Google Gemini API Integration Guide**](./docs/22_google_gemini_api_integration_guide.md) | Real Google Gemini API connectivity, resilience, safe credentials protocol, and read-only AI governance. |
 
 ---
 

@@ -7,7 +7,8 @@ from typing import Any, Dict
 
 REDACTED_PATTERNS = [
     (re.compile(r"Bearer\s+[A-Za-z0-9\-_\.]+", re.IGNORECASE), "Bearer [REDACTED_TOKEN]"),
-    (re.compile(r"(password|secret|key|api_key|token)\s*[:=]\s*['\"]?[^\s,'\"]+['\"]?", re.IGNORECASE), r"\1=[REDACTED]"),
+    (re.compile(r"(password|secret|key|api_key|token|gemini_api_key|ai_api_key)\s*[:=]\s*['\"]?[^\s,'\"]+['\"]?", re.IGNORECASE), r"\1=[REDACTED]"),
+    (re.compile(r"AIza[0-9A-Za-z\-_]{35}"), "[REDACTED_GEMINI_KEY]"),
     (re.compile(r"\b(?:\d{4}[ -]?){3}\d{4}\b"), "[REDACTED_CARD_NUMBER]"),
     (re.compile(r"\b[A-Z]{4}0[A-Z0-9]{6}\b"), "[REDACTED_IFSC]"),
 ]

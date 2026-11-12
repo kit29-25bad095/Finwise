@@ -32,8 +32,19 @@ class Settings(BaseSettings):
     AI_PROVIDER: str = "gemini"
     AI_MODEL: str = "gemini-2.0-flash"
     AI_API_KEY: Optional[str] = None
+    GEMINI_API_KEY: Optional[str] = None
     AI_TEMPERATURE: float = 0.1
     AI_MAX_TOKENS: int = 2048
+
+    @property
+    def resolved_ai_api_key(self) -> Optional[str]:
+        """
+        Returns sanitized API key from GEMINI_API_KEY or AI_API_KEY.
+        """
+        key = self.GEMINI_API_KEY or self.AI_API_KEY
+        if key and key.strip():
+            return key.strip()
+        return None
 
     # Financial Calculation Defaults
     DEFAULT_CURRENCY: str = "INR"

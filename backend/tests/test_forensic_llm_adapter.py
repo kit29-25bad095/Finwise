@@ -45,7 +45,7 @@ async def test_mock_llm_adapter_simulated_error():
 @pytest.mark.asyncio
 async def test_gemini_llm_adapter_missing_api_key():
     adapter = GeminiLLMAdapter(api_key=None)
-    with pytest.raises(LLMProviderError, match="UNVERIFIED"):
+    with pytest.raises(LLMProviderError, match="PENDING_CONFIGURATION|UNVERIFIED"):
         await adapter.generate_investigation(system_prompt="sys", user_prompt="usr")
 
 

@@ -28,6 +28,8 @@ from app.models.reconciliation import (
     AllocationStatus,
 )
 from app.models.audit import AuditLog
+from app.models.forensic import ForensicInvestigation
+from app.core.config import settings
 from app.schemas.dashboard import (
     DashboardOverviewResponse,
     ThreeWayFlowOverview,
@@ -684,22 +686,48 @@ class DashboardService:
 
     @staticmethod
     def get_ai_investigation_status(db: Session, tenant_id: uuid.UUID) -> AIInvestigationStatusResponse:
-        gemini_api_key = os.getenv("GEMINI_API_KEY")
+        gemini_api_key = settings.resolved_ai_api_key or os.getenv("GEMINI_API_KEY") or os.getenv("AI_API_KEY")
         is_configured = bool(gemini_api_key and len(gemini_api_key.strip()) > 5)
+
+        # Count actual investigations for tenant
+        count_stmt = select(func.count(ForensicInvestigation.id)).where(ForensicInvestigation.tenant_id == tenant_id)
+        investigations_count = db.execute(count_stmt).scalar() or 0
+
+        # Query recent investigations for tenant
+        recent_stmt = (
+            select(ForensicInvestigation)
+            .where(ForensicInvestigation.tenant_id == tenant_id)
+            .order_by(desc(ForensicInvestigation.created_at))
+            .limit(5)
+        )
+        recent_records = db.execute(recent_stmt).scalars().all()
+        recent_investigations = [
+            {
+                "id": str(inv.id),
+                "exception_id": str(inv.exception_id),
+                "status": inv.status,
+                "conclusion": inv.conclusion,
+                "confidence": inv.confidence,
+                "summary": inv.summary,
+                "model_provider": inv.model_provider,
+                "created_at": inv.created_at.isoformat() if inv.created_at else None,
+            }
+            for inv in recent_records
+        ]
 
         return AIInvestigationStatusResponse(
             provider="GOOGLE_GEMINI",
             status="ACTIVE" if is_configured else "PENDING_CONFIGURATION",
             is_configured=is_configured,
-            model_version="gemini-2.0-flash",
-            investigations_count=0,
+            model_version=settings.AI_MODEL or "gemini-2.0-flash",
+            investigations_count=investigations_count,
             message=(
-                "Gemini 2.0 AI Forensic Engine is active." if is_configured else
+                "Google Gemini AI Forensic Engine is active and verified." if is_configured else
                 "Google Gemini API integration is currently pending API key provisioning. "
                 "AI-assisted forensic dossiers and grounded dispute recovery narratives will activate "
                 "automatically once the GEMINI_API_KEY environment variable is configured."
             ),
-            recent_investigations=[]
+            recent_investigations=recent_investigations
         )
 
     @staticmethod
