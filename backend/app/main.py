@@ -1,4 +1,4 @@
-from fastapi import FastAPI, status, Depends
+from fastapi import FastAPI, status, Depends, Request, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -24,6 +24,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# OWASP Security Headers Middleware
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Content-Security-Policy"] = "default-src 'self'; frame-ancestors 'none';"
+    return response
 
 # Register API Routers
 app.include_router(auth.router, prefix=settings.API_V1_STR)
@@ -51,3 +62,22 @@ def healthcheck(db: Session = Depends(get_db_session)):
         "environment": settings.ENVIRONMENT,
         "database": db_status
     }
+
+
+@app.get("/health/live", status_code=status.HTTP_200_OK, tags=["System"])
+def liveness():
+    """Kubernetes / Cloud provider liveness probe."""
+    return {"status": "ALIVE"}
+
+
+@app.get("/health/ready", status_code=status.HTTP_200_OK, tags=["System"])
+def readiness(db: Session = Depends(get_db_session)):
+    """Kubernetes / Cloud provider readiness probe verifying database connectivity."""
+    try:
+        db.execute(text("SELECT 1"))
+        return {"status": "READY", "database": "CONNECTED"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Database unreachable: {str(e)}"
+        )

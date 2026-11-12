@@ -51,5 +51,18 @@ class Settings(BaseSettings):
         "http://127.0.0.1:8000",
     ]
 
+    @property
+    def is_production(self) -> bool:
+        return self.ENVIRONMENT.lower() == "production"
+
+    def validate_production_readiness(self) -> List[str]:
+        issues = []
+        if self.is_production:
+            if "super-secure" in self.SECRET_KEY or len(self.SECRET_KEY) < 32:
+                issues.append("Production environment must override default development SECRET_KEY.")
+            if self.DATABASE_URL.startswith("sqlite"):
+                issues.append("Production environment must use PostgreSQL (DATABASE_URL starting with postgresql://).")
+        return issues
+
 
 settings = Settings()

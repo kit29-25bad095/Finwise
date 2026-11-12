@@ -8,7 +8,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-14.2%20(Port%203100)-black?logo=next.js&logoColor=white)](https://nextjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%20(NUMERIC_18%2C4)-336791?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-7.0%20(RQ%20Worker)-DC382D?logo=redis&logoColor=white)](https://redis.io/)
-[![Testing](https://img.shields.io/badge/Pytest-175%2F175%20Passed%20(100%25)-brightgreen?logo=pytest&logoColor=white)](https://docs.pytest.org/)
+[![Testing](https://img.shields.io/badge/Pytest-193%2F193%20Passed%20(100%25)-brightgreen?logo=pytest&logoColor=white)](https://docs.pytest.org/)
 [![Architecture](https://img.shields.io/badge/Architecture-Modular%20Monolith-purple)](#system-architecture)
 
 **Enterprise-grade three-way financial ledger matching, contractual tariff overcharge detection, and AI-assisted dispute claim generation for Indian mid-sized D2C and e-commerce enterprises.**
@@ -364,7 +364,7 @@ cd backend
 pytest -v
 ```
 
-### Verified Test Suite Breakdown (175/175 Passing — 100% Pass Rate)
+### Verified Test Suite Breakdown (193/193 Passing — 100% Pass Rate)
 
 | Test Module | Coverage Area | Status |
 |---|---|---|
@@ -400,11 +400,15 @@ pytest -v
 | `test_forensic_security.py` | Phase 5 Authority isolation, read-only guarantees, PII sanitization, anti-hallucination (3 tests) | **PASSED** |
 | `test_forensic_api_rbac.py` | Phase 5 REST endpoints, role permissions, tenant isolation, human approval gates (2 tests) | **PASSED** |
 | `test_alembic_version_length_compatibility.py` | Alembic PostgreSQL VARCHAR(128) version table compatibility, multi-step migration (5 tests) | **PASSED** |
+| `test_phase7_security_hardening.py` | Phase 7 rate limiting, OWASP headers, RBAC Auditor write blocks, DDE injection, prompt injection, AI citation validation (10 tests) | **PASSED** |
+| `test_phase7_financial_integrity.py` | Phase 7 dynamic non-hardcoded GST rates (0%, 5%), balance conservation, decimal precision, knapsack boundaries (5 tests) | **PASSED** |
+| `test_phase7_blind_holdout_benchmark.py` | Phase 7 500-scenario independent synthetic holdout benchmark evaluation (1 test) | **PASSED** |
+| `test_phase7_backup_restore.py` | Phase 7 live database snapshot, disaster recovery drill, cryptographic checksum verification (2 tests) | **PASSED** |
 
 ```
 ============================== test session summary ==============================
 Platform: win32 | Python: 3.12/3.14 | Pytest: 9.1.1 | Hypothesis: 6.170.15
-175 passed, 10 warnings in 102.15s (100% pass rate)
+193 passed, 9 warnings in 45.77s (100% pass rate)
 ===================================================================================
 ```
 
@@ -424,6 +428,10 @@ Platform: win32 | Python: 3.12/3.14 | Pytest: 9.1.1 | Hypothesis: 6.170.15
    Post-inference validators inspect every reference ID cited by the AI. If an unsupplied ID or UTR is detected, the dossier is rejected and status falls back to `INCONCLUSIVE`.
 6. **Immutable Audit Ledger:**
    The `audit_logs` table maintains append-only records of all entity mutations, previous/new JSON states, user rationales, IP addresses, and timestamps.
+7. **Rate Limiting & Brute-Force Lockout:**
+   Authentication endpoints enforce sliding-window rate limiting (10 req/min) and 60-second lockouts on brute-force login failures.
+8. **OWASP Standard Security Headers:**
+   All HTTP responses emit `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `X-XSS-Protection`, and HSTS headers.
 
 ---
 
@@ -454,6 +462,12 @@ Comprehensive architectural specifications and formal audit reports are located 
 | [**19. Phase 4 Group A2.1 Retention Report**](./docs/18_phase_4_group_a2_1_financial_history_retention_report.md) | Group A2.1 tenant financial history retention, soft delete, and fail-closed migrations. |
 | [**20. Phase 5 AI Forensic Investigator**](./docs/19_phase_5_ai_forensic_investigator_implementation_report.md) | Phase 5 read-only evidence-based AI root cause analysis, confidence scoring, and claim drafts. |
 | [**21. Phase 6 Dashboard Report**](./docs/20_phase_6_dashboard_implementation_report.md) | Phase 6 financial review dashboard architecture, leakage analytics, review queue, and verification. |
+| [**22. Phase 7 Security Audit Report**](./docs/16_phase_7_security_audit_report.md) | Phase 7 formal security hardening, OWASP Top 10 defenses, rate limiting, and RBAC audits. |
+| [**23. Phase 7 Blind Holdout Benchmark**](./docs/17_blind_holdout_benchmark_report.md) | 500-scenario independent synthetic holdout benchmark results, precision, and conservation parity. |
+| [**24. Phase 7 Backup & Disaster Recovery**](./docs/18_backup_restore_verification.md) | Live database snapshot, catastrophic failure simulation, restoration drill, and RPO/RTO targets. |
+| [**25. Phase 7 Production Deployment Guide**](./docs/19_production_deployment_guide.md) | Production topology, environment variable references, and multi-container Docker compose runbooks. |
+| [**26. Phase 7 Pilot Operations Manual**](./docs/20_pilot_operations_manual.md) | Merchant onboarding, daily reconciliation SOP, human review protocols, and retention policies. |
+| [**27. Phase 7 Final Release Readiness**](./docs/21_final_release_readiness_report.md) | Final release readiness report with measurable acceptance criteria and PILOT READY verdict. |
 
 ---
 

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db_session
+from app.core.rate_limiter import auth_rate_limiter
 from app.services.auth_service import AuthService
 from app.services.tenant_service import TenantService
 from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse
@@ -19,22 +20,28 @@ def register(
     req: RegisterRequest,
     session: Session = Depends(get_db_session)
 ):
+    auth_rate_limiter.check_rate_limit(request)
     client_ip = request.client.host if request.client else None
     return AuthService.register_user_with_tenant(session, req, ip_address=client_ip)
 
 
 @router.post("/login", response_model=TokenResponse)
 def login(
+    request: Request,
     req: LoginRequest,
     session: Session = Depends(get_db_session)
 ):
+    auth_rate_limiter.check_rate_limit(request)
     user = AuthService.authenticate_user(session, req.email, req.password)
     if not user:
+        auth_rate_limiter.record_failure(request)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password.",
             headers={"WWW-Authenticate": "Bearer"}
         )
+
+    auth_rate_limiter.record_success(request)
 
     memberships = TenantService.get_user_memberships(session, user.id)
     if not memberships:
