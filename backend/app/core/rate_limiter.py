@@ -104,3 +104,20 @@ auth_rate_limiter = InMemoryRateLimiter(
     lockout_threshold=5,
     lockout_duration_seconds=60
 )
+
+# Global CSV file upload rate limiter (30 uploads/minute per client IP)
+upload_rate_limiter = InMemoryRateLimiter(
+    requests_limit=30,
+    window_seconds=60,
+    lockout_threshold=10,
+    lockout_duration_seconds=60
+)
+
+# Global AI forensic investigation rate limiter (20 investigations/minute per client IP)
+forensic_rate_limiter = InMemoryRateLimiter(
+    requests_limit=20,
+    window_seconds=60,
+    lockout_threshold=8,
+    lockout_duration_seconds=60
+)
+

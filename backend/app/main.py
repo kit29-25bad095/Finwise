@@ -7,6 +7,8 @@ from app.core.config import settings
 from app.core.database import get_db_session
 from app.api.v1 import auth, tenants, ingestion, reconciliation, leakage, forensic, dashboard
 
+from app.workers.queue import check_worker_queue_health
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description="Deterministic Financial Reconciliation & Revenue Leakage Detection Engine for Indian D2C Enterprises.",
@@ -72,12 +74,31 @@ def liveness():
 
 @app.get("/health/ready", status_code=status.HTTP_200_OK, tags=["System"])
 def readiness(db: Session = Depends(get_db_session)):
-    """Kubernetes / Cloud provider readiness probe verifying database connectivity."""
+    """Kubernetes / Cloud provider readiness probe verifying database, queue, and AI dependencies."""
     try:
         db.execute(text("SELECT 1"))
-        return {"status": "READY", "database": "CONNECTED"}
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Database unreachable: {str(e)}"
         )
+
+    queue_health = check_worker_queue_health()
+    if queue_health["status"].startswith("UNAVAILABLE") and not settings.WORKER_FALLBACK_SYNC:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Redis worker queue unavailable in strict production mode: {queue_health['status']}"
+        )
+
+    ai_configured = bool(settings.resolved_ai_api_key)
+
+    return {
+        "status": "READY",
+        "database": "CONNECTED",
+        "worker_queue": queue_health,
+        "ai_provider": {
+            "provider": settings.AI_PROVIDER,
+            "model": settings.AI_MODEL,
+            "status": "CONFIGURED" if ai_configured else "PENDING_CONFIGURATION"
+        }
+    }

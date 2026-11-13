@@ -2,13 +2,14 @@ import uuid
 import csv
 import io
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, desc
 
 from app.core.database import get_db_session as get_db
 from app.core.rbac import Role
+from app.core.rate_limiter import upload_rate_limiter
 from app.api.deps import get_current_user, get_current_tenant_membership, RoleChecker
 from app.models.user import User
 from app.models.tenant import TenantMembership
@@ -42,12 +43,14 @@ router = APIRouter(prefix="/ingestion", tags=["Data Ingestion & Normalization"])
     summary="Upload financial statement or order export CSV"
 )
 async def upload_csv_file(
+    request: Request,
     source_type: str = Form(..., description="SHOPIFY, RAZORPAY, or HDFC"),
     file: UploadFile = File(..., description="Source CSV document"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     membership: TenantMembership = Depends(RoleChecker([Role.ADMIN, Role.FINANCE_MANAGER])),
 ):
+    upload_rate_limiter.check_rate_limit(request)
     tenant_id = membership.tenant_id
 
     file_bytes = await file.read()

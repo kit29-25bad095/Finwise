@@ -65,3 +65,34 @@ class WorkerDispatcher:
 
 
 enqueue_job = WorkerDispatcher.dispatch_job
+
+
+def check_worker_queue_health() -> Dict[str, Any]:
+    """
+    Returns worker and queue connectivity status for operational readiness probes.
+    """
+    if settings.WORKER_FALLBACK_SYNC or settings.ENVIRONMENT == "test":
+        return {
+            "mode": "SYNC_LOCAL",
+            "redis_connected": False,
+            "status": "OPERATIONAL_FALLBACK",
+            "queue_depth": 0
+        }
+    try:
+        client = redis.from_url(settings.REDIS_URL, socket_timeout=1, socket_connect_timeout=1)
+        client.ping()
+        q = Queue("finora_reconciliation_tasks", connection=client)
+        return {
+            "mode": "ASYNC_REDIS",
+            "redis_connected": True,
+            "status": "OPERATIONAL",
+            "queue_depth": len(q)
+        }
+    except Exception as e:
+        return {
+            "mode": "ASYNC_REDIS",
+            "redis_connected": False,
+            "status": f"UNAVAILABLE: {str(e)}",
+            "queue_depth": None
+        }
+
