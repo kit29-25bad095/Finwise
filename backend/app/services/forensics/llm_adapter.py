@@ -112,7 +112,26 @@ class GeminiLLMAdapter(BaseLLMAdapter):
                     )
 
                 text = getattr(response, "text", "") or ""
-                return self._parse_json_response(text)
+                parsed_data = self._parse_json_response(text)
+
+                # Capture usage metadata telemetry and audit log
+                usage = getattr(response, "usage_metadata", None)
+                if usage:
+                    prompt_tokens = getattr(usage, "prompt_token_count", None)
+                    candidate_tokens = getattr(usage, "candidates_token_count", None)
+                    total_tokens = getattr(usage, "total_token_count", None)
+                    logger.info(
+                        f"Gemini investigation completed. Model: {self.model_name}, "
+                        f"Prompt tokens: {prompt_tokens}, Candidate tokens: {candidate_tokens}, Total tokens: {total_tokens}"
+                    )
+                    parsed_data["_token_usage"] = {
+                        "prompt_tokens": prompt_tokens,
+                        "candidate_tokens": candidate_tokens,
+                        "total_tokens": total_tokens,
+                        "model": self.model_name
+                    }
+
+                return parsed_data
 
             except asyncio.TimeoutError:
                 last_error = f"Gemini request timed out after {self.timeout_seconds}s (attempt {attempt}/{self.max_retries})"

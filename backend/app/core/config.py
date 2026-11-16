@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     # Database: Supports PostgreSQL (postgresql://) and SQLite (sqlite://)
     DATABASE_URL: str = "sqlite:///./finora.db"
     SYNC_DATABASE_URL: str = "sqlite:///./finora.db"
+    DB_POOL_SIZE: int = 20
+    DB_MAX_OVERFLOW: int = 10
+    DB_POOL_TIMEOUT: int = 30
+    DB_POOL_RECYCLE: int = 1800
+    DB_SSL_MODE: Optional[str] = None
 
     # Redis & Background Workers
     REDIS_URL: str = "redis://localhost:6379/0"

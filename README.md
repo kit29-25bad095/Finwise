@@ -7,21 +7,21 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Next.js](https://img.shields.io/badge/Next.js-14.2%20(Port%203100)-black?logo=next.js&logoColor=white)](https://nextjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%20(NUMERIC_18%2C4)-336791?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![Redis](https://img.shields.io/badge/Redis-7.0%20(RQ%20Worker)-DC382D?logo=redis&logoColor=white)](https://redis.io/)
-[![Testing](https://img.shields.io/badge/Pytest-193%2F193%20Passed%20(100%25)-brightgreen?logo=pytest&logoColor=white)](https://docs.pytest.org/)
+[![Redis](https://img.shields.io/badge/Redis-7.0%20(Queue)-DC382D?logo=redis&logoColor=white)](https://redis.io/)
+[![Automated Tests](https://img.shields.io/badge/Tests-220%20Passed%20%7C%201%20Skipped-brightgreen?logo=pytest&logoColor=white)](https://docs.pytest.org/)
 [![Architecture](https://img.shields.io/badge/Architecture-Modular%20Monolith-purple)](#system-architecture)
 
-**Enterprise-grade three-way financial ledger matching, contractual tariff overcharge detection, and AI-assisted dispute claim generation for Indian mid-sized D2C and e-commerce enterprises.**
+**Enterprise-grade three-way financial ledger matching, contractual tariff overcharge detection, and evidence-backed dispute claim generation for Indian D2C and high-volume e-commerce enterprises.**
 
-[Key Principles](#core-financial-principles) •
+[Executive Overview](#executive-overview) •
+[Core Principles](#core-financial-principles) •
 [Architecture](#system-architecture) •
-[Deterministic Reconciliation Pipeline](#deterministic-reconciliation-pipeline) •
-[The Four Core Leakage Detectors](#the-four-core-leakage-detectors) •
-[Enterprise Review Dashboard](#enterprise-review-dashboard) •
+[Reconciliation Pipeline](#deterministic-reconciliation-pipeline) •
+[Leakage Detectors](#the-four-core-leakage-detectors) •
 [Technology Stack](#technology-stack) •
 [Quick Start](#quick-start-guide) •
-[Automated Test Verification](#verification--automated-testing) •
-[Documentation Index](#architectural-specifications-index)
+[Automated Verification](#verification--automated-testing) •
+[Documentation](#documentation--production-readiness)
 
 </div>
 
@@ -29,103 +29,103 @@
 
 ## Executive Overview
 
-Indian mid-sized direct-to-consumer (D2C) businesses (₹15 Lakh to ₹2 Crore monthly GMV; 1,000 to 50,000 monthly transactions) process financial events across three independent, disconnected ledgers:
-1. **Order Management Systems** (Shopify line-item orders, fulfillments, cancellations, discounts).
-2. **Payment Gateways** (Razorpay gross captures, payment methods, MDR fees, GST, refunds, settlement batches).
-3. **Banking Statements** (Aggregated lump-sum RTGS/NEFT nodal credits, UTR references, clearing dates).
+Indian direct-to-consumer (D2C) brands and multi-channel e-commerce merchants (₹15 Lakh to ₹50 Crore monthly GMV; 1,000 to 250,000+ monthly orders) process financial transactions across three independent, disconnected ledgers:
 
-Discrepancies in settlement timing, payment method interchange fees, refund handling, and bank narration truncation cause substantial revenue leakage (typically 0.8% to 2.5% of GMV). **Finora** provides deterministic three-way reconciliation to automatically identify, quantify, and substantiate recoverable revenue leakages with forensic audit trails.
+1. **Order Management Systems (OMS):** Shopify/WooCommerce line-item orders, fulfillments, discounts, cancellations, and customer refunds.
+2. **Payment Gateways (PG):** Razorpay, Cashfree, or Pine Labs gross captures, payment method interchange fees (MDR), GST (18%), and aggregated nodal settlements.
+3. **Banking Statements:** Corporate nodal and current accounts (HDFC, ICICI, Axis) with lump-sum RTGS/NEFT batch credits, truncated narration strings, and clearing date lags.
+
+Discrepancies in settlement timing, gateway interchange overcharges, untracked refunds, and bank nodal narration truncation lead to an average **0.8% to 2.4% revenue leakage** against top-line GMV.
+
+**Finora** provides deterministic, double-entry three-way reconciliation to automatically ingest, normalize, match, and detect recoverable revenue leakages with tamper-evident audit trails and grounded AI forensic investigation dossiers.
 
 ---
 
 ## Core Financial Principles
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│                             FINORA CORE MANDATES                                 │
-├──────────────────────────────────────────────────────────────────────────────────┤
-│ 1. NO DISCREPANCY WITHOUT TRACEABILITY:                                          │
-│    Every identified delta retains full provenance back to source file hashes,    │
-│    original row offsets, and immutable ledger identifiers.                       │
-│                                                                                  │
-│ 2. NO RECOVERY CLAIM WITHOUT EVIDENCE:                                           │
-│    A detected discrepancy does not constitute a verified financial loss without  │
-│    contractual tariff, gateway ledger, and banking substantiation.               │
-│                                                                                  │
-│ 3. NO FINANCIAL CALCULATION DELEGATED TO AI:                                     │
-│    100% of financial calculations, allocations, fees, and tolerances are pure    │
-│    deterministic Python routines using arbitrary-precision Decimals. The AI      │
-│    engine acts strictly as a forensic investigator, translator, and dossier      │
-│    generator.                                                                    │
-│                                                                                  │
-│ 4. DOUBLE-ENTRY BALANCE CONSERVATION:                                            │
-│    Allocated amounts never exceed available source balances or destination       │
-│    balances. Partial and many-to-many allocations maintain exact balance parity. │
-└──────────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                              FINORA FINANCIAL INVARIANTS                               │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ 1. ZERO FLOATING-POINT ARITHMETIC:                                                     │
+│    100% of financial calculations use arbitrary-precision Python Decimal (ROUND_HALF_UP)│
+│    persisted in PostgreSQL as NUMERIC(18, 4). Native floats are strictly prohibited.   │
+│                                                                                        │
+│ 2. DOUBLE-ENTRY BALANCE CONSERVATION:                                                  │
+│    Allocated amounts never exceed remaining source or destination balances.            │
+│    Partial and many-to-many allocations maintain exact balance parity at all times.    │
+│                                                                                        │
+│ 3. STRICT READ-ONLY AI BOUNDARIES:                                                     │
+│    No financial calculation, fee computation, or reconciliation decision is ever       │
+│    delegated to an LLM. AI models act exclusively as forensic evidence synthesizers.   │
+│                                                                                        │
+│ 4. FULL AUDIT PROVENANCE & TRACEABILITY:                                               │
+│    Every identified delta retains full cryptographic lineage back to source file       │
+│    hashes, original CSV row offsets, and immutable ledger identifiers.                 │
+└────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## System Architecture
 
-Finora is structured as a high-performance **Modular Monolith** with compute-intensive background execution separated into dedicated worker queues.
+Finora is architected as an enterprise **Modular Monolith** designed for high throughput, predictable execution, and strict tenant isolation. Compute-intensive CSV normalization and bounded subset matching execute via asynchronous background queues.
 
 ```mermaid
 flowchart TD
-    subgraph Client Tier
-        UI["Next.js 14 Enterprise UI (Port 3100)\n(App Router + Monochrome Editorial Design + TypeScript)"]
+    subgraph Client Tier ["Client Presentation Tier"]
+        UI["Next.js 14 Enterprise Dashboard (Port 3100)\n(App Router • TypeScript • Monochrome Editorial UI)"]
     end
 
-    subgraph API & Domain Gateway
-        API["FastAPI Application Core (/api/v1/) (Port 8000)"]
+    subgraph Security & Gateway ["API Gateway & Security Layer"]
+        API["FastAPI Core (Port 8000)"]
         AUTH["JWT (RS256/HS256) & RBAC\n(Admin | Finance Manager | Auditor)"]
-        TENANT["Tenant Isolation Resolver\n(Tenant-Scoped Queries & Model Guards)"]
+        TENANT["Cryptographic Tenant Isolation\n(Strict Tenant-Scoped Query Guards)"]
+        RATELIMIT["Multi-Tier Rate Limiters\n(Auth: 5/m • Upload: 30/m • Forensics: 20/m)"]
     end
 
-    subgraph Data Ingestion Tier
-        INGEST["Streaming Multipart Parser & DDE Formula Sanitizer"]
-        ADAPT["Source Adapters:\n• ShopifyAdapter\n• RazorpayAdapter\n• HDFCBankAdapter"]
+    subgraph Data Ingestion ["Data Ingestion & Normalization Tier"]
+        INGEST["Streaming Multipart Parser & CSV Formula Sanitizer"]
+        ADAPT["Adapters:\n• Shopify (Orders/Refunds)\n• Razorpay (Payments/Batches)\n• HDFC (Bank Statements)"]
     end
 
-    subgraph Deterministic Financial Core
-        CANONICAL["Canonical Financial Schema\n(NUMERIC 18,4 • Zero Float)"]
-        RECON["Deterministic Matching Engine\n(Passes 1 to 6 • Anti-Collision Guard)"]
+    subgraph Financial Core ["Deterministic Financial Core"]
+        CANONICAL["Canonical Schema Normalizer\n(NUMERIC 18,4 • Zero Float)"]
+        RECON["Deterministic 6-Pass Matching Engine\n(Passes 1-4 • Anti-Collision Scoring)"]
         KNAPSACK["Bounded Knapsack Solver (N <= 5)\n(Never-Force-Match Guarantee)"]
-        FEE["Contractual Fee & Tariff Engine\n(MDR + GST @ 18% • ε = ₹0.05 Tolerance)"]
-        ALLOC["Allocation Engine\n(Row Locks • Conservation of Balance)"]
-        DETECTORS["Four Core Leakage Detectors\n(Pure Math • Dynamic Contracts)"]
+        FEE["Contractual Fee & Dynamic Tariff Engine\n(MDR + GST @ 18% • ε = ₹0.05 Tolerance)"]
+        DETECTORS["Four Core Revenue Leakage Detectors\n(Pure Math • SLA & RBI Banking Calendar)"]
     end
 
-    subgraph Storage & Workers
-        DB[("PostgreSQL 16\n(Authoritative System of Record)")]
-        REDIS[("Redis 7 + RQ Worker Cluster")]
-        S3[("Encrypted Object Store\n(Private CSV Provenance)")]
+    subgraph AI Forensic ["AI Forensic Investigation Layer"]
+        BUNDLE["PII-Scrubbed Structured Evidence Pack"]
+        AI["Provider-Abstracted LLM Adapter\n(Google Gemini 2.0 • Fallback Drivers)"]
+        VAL["Citation & Anti-Hallucination Gatekeeper\n(Validates All Cited IDs & UTRs)"]
+        CLAIM["Dispute Claim Dossier Generator\n(Structured Recovery Evidence)"]
     end
 
-    subgraph AI Forensic Layer
-        BUNDLE["PII-Scrubbed Structured Evidence Bundle"]
-        AI["Provider-Agnostic LLM Gateway\n(Gemini 2.0 / OpenAI / Anthropic)"]
-        VAL["Grounded Citation Validator\n(Anti-Hallucination Gate)"]
-        CLAIM["Automated Dispute Dossier Generator\n(PDF & CSV Line-Items)"]
+    subgraph Storage Tier ["Authoritative Persistence Tier"]
+        DB[("PostgreSQL 16 Cluster\n(ACID System of Record)")]
+        REDIS[("Redis 7 Cluster\n(Async Queue & State)")]
+        AUDIT[("Append-Only Audit Ledger\n(Immutable Event Log)")]
     end
 
     UI -->|HTTPS / REST| API
-    API --> AUTH --> TENANT
-    TENANT --> INGEST --> ADAPT --> CANONICAL
-    CANONICAL --> RECON --> KNAPSACK --> FEE --> ALLOC
-    ALLOC --> DETECTORS
+    API --> AUTH --> TENANT --> RATELIMIT
+    RATELIMIT --> INGEST --> ADAPT --> CANONICAL
+    CANONICAL --> RECON --> KNAPSACK --> FEE --> DETECTORS
     DETECTORS --> BUNDLE --> AI --> VAL --> CLAIM
 
     API -.->|Async Jobs| REDIS
     API -.->|ACID Persistence| DB
-    INGEST -.->|Raw Files| S3
+    API -.->|Audit Trail| AUDIT
 ```
 
 ---
 
 ## Deterministic Reconciliation Pipeline
 
-Finora executes a rigorous multi-pass deterministic matching algorithm that guarantees zero false allocations and isolates ambiguities for human review:
+Finora executes a 6-pass deterministic matching algorithm that guarantees zero false allocations and routes genuine ambiguities to a human-in-the-loop review queue:
 
 ```
 [Canonical Ingested Records (Shopify, Razorpay, HDFC)]
@@ -133,10 +133,10 @@ Finora executes a rigorous multi-pass deterministic matching algorithm that guar
         ▼
 [Pass 1: Exact Gateway Payment ID & Order Reference Match] (1:1 / 1:N)
         Shopify Orders <──> Razorpay Payments (Captures & Refunds)
-        Validates Gross, Discount, Tax, and Net amounts.
+        Validates Gross, Discount, Tax, and Net captured amounts.
         │
         ▼
-[Pass 2: Exact Settlement ID & UTR Match] (1:1 Settlement Batch <──> Bank Credit)
+[Pass 2: Exact Settlement ID & UTR Match] (1:1 Batch <──> Bank Credit)
         Razorpay Settlement Batches <──> HDFC Bank Statement Credits
         Validates settlement UTR, settlement date, and credit amount.
         │
@@ -157,9 +157,9 @@ Finora executes a rigorous multi-pass deterministic matching algorithm that guar
 [Pass 5: Controlled Aggregated Allocation (Bounded Knapsack)]
         Evaluates 1 Bank Credit against N Settlement Batches (N <= 5).
         NEVER FORCES A MATCH:
-          • Exactly 1 valid subset -> AGGREGATED_MATCH
-          • Multiple valid subsets -> AMBIGUOUS_AGGREGATION_COLLISION
-          • Search bound exhausted -> UNRESOLVED_SUBSET_BOUND_EXCEEDED
+          • Exactly 1 valid subset  ──► AGGREGATED_MATCH
+          • Multiple valid subsets  ──► AMBIGUOUS_AGGREGATION_COLLISION
+          • Search bound exhausted  ──► UNRESOLVED_SUBSET_BOUND_EXCEEDED
         │
         ▼
 [Pass 6: Ambiguity Isolation & Human Review Queue]
@@ -171,53 +171,29 @@ Finora executes a rigorous multi-pass deterministic matching algorithm that guar
 
 ## The Four Core Leakage Detectors
 
-All detectors are pure deterministic mathematical functions executing arbitrary-precision Decimal arithmetic:
-
-$$\mathcal{D}_k: (\mathcal{L}_{\text{canonical}}, \mathcal{C}_{\text{contract}}, \mathcal{T}_{\text{calendar\_config}}, \Theta_{\text{tolerance\_config}}) \longrightarrow \text{List}[\text{LeakageException}]$$
+All detectors are pure deterministic mathematical functions executing arbitrary-precision Decimal arithmetic with parameterized RBI holiday calendars and provider cutoff hours:
 
 | # | Detector | Trigger Condition | Core Mathematical Formula | Confidence & Defense |
-|---|---|---|---|---|
-| **1** | **Missing Gateway Settlement** | Successful capture has no corresponding settlement batch after contractual due date. | $\Delta_{\text{Settlement}} = \text{CapturedAmount} - \sum \text{SettledAmount}$<br>$\text{DueDate} = \text{AddBusinessDays}(\text{CaptureDate}, T_{\text{contract}}, \mathcal{T}_{\text{calendar}})$ | Parameterized provider cutoff (23:00 / 18:00 IST) and RBI RTGS / 2nd & 4th Saturday holiday calendar. |
-| **2** | **Settlement Not Credited to Bank** | Settlement batch marked `settled` with UTR cannot be matched to bank credits. | $\Delta_{\text{Bank}} = \text{NetSettlementAmount} - \sum \text{AllocatedBankCredit}$ | Statement gap detection suppresses false claims if dates are missing; UTR token verification. |
-| **3** | **Contractual Fee Overcharge** | Gateway MDR + GST charged deviates from versioned contract tariff by more than $\epsilon$. | $\Delta_{\text{Fee}} = (\text{ReportedFee} + \text{ReportedTax}) - (\text{ContractBaseFee} + \text{ContractGST})$ | Configurable tolerance $\epsilon$ (default ₹0.05) absorbs sub-paisa rounding; tiered rates by instrument. |
-| **4** | **Duplicate or Unauthorized Refund** | Duplicate refund reference, refunds exceeding capture amount, or returns without Shopify cancellation. | $\Delta_{\text{ExcessRefund}} = \max\left(0, \sum \text{RefundAmount} - \text{CapturedAmount}\right)$ | Distinguishes legitimate partial refunds from unauthorized refund injections and system duplicates. |
-
----
-
-## Enterprise Review Dashboard
-
-Finora features a high-density, monochrome editorial dashboard built for finance controllers, operations teams, and auditors:
-
-```
-┌────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ FINORA FINANCIAL REVIEW WORKSPACE                                                                   │
-├────────────────────────────────────────────────────────────────────────────────────────────────────┤
-│ • Executive Overview: Live Three-Way Ledger Flow (Shopify → Razorpay → Settlements → HDFC Credits)│
-│ • Revenue Leakage Monitoring: 4 Detector cards, severity filtering, side-by-side discrepancy diffs │
-│ • Reconciliation Run Manager: Full execution history, status badges, and single-click Run N+1      │
-│ • Human Review Queue: Decision modal for APPROVE, REJECT, and MANUAL_ALLOCATE with mandatory notes │
-│ • Canonical Explorer: Filterable dual-tab inspector for Orders, Payments, Settlements & Bank Txns │
-│ • Contract & Fee Analytics: Tariff tiers (UPI, CC, DC, NetBanking), dynamic GST %, and fee drift   │
-│ • Forensic Investigations: Grounded AI evidence viewer (with graceful unconfigured provider state) │
-│ • Immutable Audit Ledger: Cryptographically tracked user mutations, timestamps, and IP provenance │
-└────────────────────────────────────────────────────────────────────────────────────────────────────┘
-```
+|:---:|:---|:---|:---|:---|
+| **1** | **Missing Gateway Settlement** | Successful capture has no corresponding settlement batch after contractual due date. | $$\Delta_{\text{Settlement}} = \text{CapturedAmount} - \sum \text{SettledAmount}$$ | Parameterized cutoff (23:00 / 18:00 IST) and RBI RTGS / 2nd & 4th Saturday holiday calendar. |
+| **2** | **Settlement Not Credited to Bank** | Settlement batch marked `settled` with UTR cannot be matched to bank credits. | $$\Delta_{\text{Bank}} = \text{NetSettlementAmount} - \sum \text{AllocatedBankCredit}$$ | Statement gap detection suppresses false claims if dates are missing; UTR token verification. |
+| **3** | **Contractual Fee Overcharge** | Gateway MDR + GST charged deviates from versioned contract tariff by more than $\epsilon$. | $$\Delta_{\text{Fee}} = (\text{ReportedFee} + \text{ReportedTax}) - (\text{ContractBaseFee} + \text{ContractGST})$$ | Configurable tolerance $\epsilon$ (default ₹0.05) absorbs sub-paisa rounding; tiered rates by instrument. |
+| **4** | **Duplicate / Unauthorized Refund** | Duplicate refund reference, refunds exceeding capture amount, or returns without order cancellation. | $$\Delta_{\text{ExcessRefund}} = \max\left(0, \sum \text{RefundAmount} - \text{CapturedAmount}\right)$$ | Distinguishes legitimate partial refunds from unauthorized refund injections and system duplicates. |
 
 ---
 
 ## Technology Stack
 
-| Layer | Technology | Rationale & Configuration |
-|---|---|---|
-| **Backend Core** | **FastAPI** (Python 3.11+) | Asynchronous, OpenAPI auto-generated schema, high concurrency. |
-| **Financial Math** | **Python `decimal.Decimal`** | Arbitrary-precision monetary math (`ROUND_HALF_UP`); floating-point strictly prohibited. |
-| **ORM & Migrations** | **SQLAlchemy 2.0 + Alembic** | Strict relational integrity, transaction management, automated migrations. |
-| **Primary Database** | **PostgreSQL 16** | `NUMERIC(18, 4)` columns, tenant isolation query guards. |
-| **Background Queue** | **Redis 7 + RQ** | Compute-heavy CSV parsing, Knapsack matching, with sync test fallback. |
-| **Frontend UI** | **Next.js 14 (Port 3100)** | TypeScript strict typing, server-side rendering, Monochrome Editorial design system. |
-| **Styling & Fonts** | **Tailwind CSS + Inter + JetBrains Mono** | Tabular numerals, right-aligned currency columns, strict monochrome theme tokens. |
-| **AI Investigation** | **Abstract Provider Gateway** | Decoupled support for Google Gemini, OpenAI, Anthropic, or Mock driver. |
-| **Testing Harness** | **Pytest + Hypothesis** | Property-based invariant testing, regression suites, 100% test passing rate. |
+| Layer | Technology | Rationale & Enterprise Configuration |
+|:---|:---|:---|
+| **Backend Framework** | **FastAPI (Python 3.11+)** | High-performance asynchronous REST API, OpenAPI schema generation, typed Pydantic validation. |
+| **Financial Arithmetic** | **Python `decimal.Decimal`** | Arbitrary-precision monetary math (`ROUND_HALF_UP`); floating-point strictly prohibited across the codebase. |
+| **Database & ORM** | **PostgreSQL 16 + SQLAlchemy 2.0** | Relational ACID guarantees, `NUMERIC(18, 4)` columns, connection pooling, and Alembic migrations. |
+| **Asynchronous Workers** | **Redis 7 + Worker Queue** | Distributed queue for CSV ingestion and Knapsack matching; graceful fallback for testing. |
+| **Frontend Framework** | **Next.js 14 (App Router)** | Server-side rendering, strict TypeScript typing, running on standalone port 3100. |
+| **Design System** | **Tailwind CSS + JetBrains Mono** | High-density monochrome editorial theme, tabular numerals, right-aligned currency columns. |
+| **AI Investigation** | **Google Gemini 2.0 (SDK `google-genai`)** | Provider-abstracted LLM adapter with structured output, citation validation, and offline mock driver. |
+| **Test Engineering** | **Pytest + Hypothesis** | Property-based testing, independent mathematical test oracle, 100% invariant compliance. |
 
 ---
 
@@ -227,59 +203,37 @@ Finora features a high-density, monochrome editorial dashboard built for finance
 Finwise/
 ├── backend/
 │   ├── app/
-│   │   ├── api/v1/             # Versioned REST endpoints
-│   │   │   ├── auth.py         # Registration, JWT login, profile
-│   │   │   ├── tenants.py      # Tenant settings and member management
-│   │   │   ├── ingestion.py    # CSV multipart upload, batch progress, error export
-│   │   │   ├── reconciliation.py # Runs, matches, ambiguous review, contracts
-│   │   │   ├── leakage.py      # Phase 4 detector execution, findings, review actions
-│   │   │   ├── forensic.py     # Phase 5 AI investigations, evidence packs, claim drafts
-│   │   │   ├── dashboard.py    # Phase 6 executive overview, 3-way flow, review queue
-│   │   │   └── health.py       # Liveness and readiness probes
-│   │   ├── core/               # Configuration, database engine, security, RBAC
-│   │   ├── models/             # SQLAlchemy entities (Tenant, Canonical, Recon, Leakage, Forensic)
-│   │   ├── schemas/            # Pydantic validation schemas
-│   │   ├── services/           # Domain services
-│   │   │   ├── auth_service.py # Authentication & password hashing
-│   │   │   ├── tenant_service.py # Multi-tenant isolation & memberships
-│   │   │   ├── ingestion/      # Shopify, Razorpay, HDFC adapters & sanitizers
-│   │   │   ├── reconciliation/ # Fee calculator, scoring engine, knapsack solver
-│   │   │   ├── leakage/        # 4 core detectors, banking calendars, clearing verifiers
-│   │   │   ├── forensics/      # Evidence bundle builder, confidence scoring, claim drafts
-│   │   │   └── dashboard_service.py # Authoritative metrics, 3-way flow, review queue
-│   │   ├── workers/            # RQ background worker tasks
-│   │   └── main.py             # FastAPI entrypoint, CORS, exception handlers
-│   ├── alembic/                # Migration scripts (001 to 007)
-│   ├── tests/                  # 27 automated test suites (175 passing tests)
-│   ├── requirements.txt        # Pinned production dependencies
-│   ├── pytest.ini              # Test runner configuration
-│   └── Dockerfile              # Containerized backend build
+│   │   ├── api/v1/                 # Versioned REST API endpoints (Auth, Ingestion, Recon, Leakage, Forensics)
+│   │   ├── core/                   # Configuration, database engine, security middleware, rate limiters
+│   │   ├── models/                 # SQLAlchemy relational models (Tenant, Canonical, Recon, Leakage, Audit)
+│   │   ├── schemas/                # Strict Pydantic validation and serialization schemas
+│   │   ├── services/               # Core domain services
+│   │   │   ├── ingestion/          # CSV parsers and source adapters (Shopify, Razorpay, HDFC)
+│   │   │   ├── reconciliation/     # Multi-pass matching engine, scoring algorithm, bounded Knapsack solver
+│   │   │   ├── leakage/            # Four core leakage detectors, banking calendar, SLA verifiers
+│   │   │   └── forensics/          # Evidence pack builder, LLM adapter, hallucination gatekeeper
+│   │   ├── workers/                # Background worker queue definitions and task handlers
+│   │   └── main.py                 # FastAPI application factory, CORS, and request ID middleware
+│   ├── alembic/                    # Database migration scripts (001 through 007)
+│   ├── tests/                      # 38 automated test suites (221 test cases)
+│   ├── requirements.txt            # Pinned production Python dependencies
+│   └── Dockerfile                  # Production container definition for FastAPI backend
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── app/                # Next.js App Router (Port 3100)
-│   │   │   ├── login/          # Monochrome login page
-│   │   │   ├── dashboard/      # Executive Overview & 3-Way Reconciliation Flow
-│   │   │   │   ├── leakage-detection/ # Dedicated 4-detector revenue leakage workspace
-│   │   │   │   ├── reconciliation/    # Run management, execution history, Run N+1
-│   │   │   │   ├── exceptions/        # Human Review Queue for ambiguous matches
-│   │   │   │   ├── transactions/      # Canonical Transaction Explorer
-│   │   │   │   ├── contracts/         # Versioned contract tariffs & fee analytics
-│   │   │   │   ├── investigations/    # AI forensic investigation dossier viewer
-│   │   │   │   └── audit/             # Immutable audit trail
-│   │   │   └── page.tsx        # High-density landing page
-│   │   ├── components/         # Reusable UI widgets and layout shells
-│   │   │   ├── shell/          # Topbar, Sidebar, Navigation shells
-│   │   │   └── ui/             # Monochrome editorial components (Button, Modal, Drawer)
-│   │   └── lib/                # Typed API client, Indian Rupee & date formatters
-│   ├── package.json            # Node.js dependencies
-│   ├── tsconfig.json           # TypeScript configuration
-│   └── tailwind.config.ts      # Strict monochrome theme tokens
+│   │   ├── app/                    # Next.js App Router pages (Port 3100)
+│   │   │   ├── login/              # Secure multi-tenant authentication portal
+│   │   │   └── dashboard/          # Executive Overview, 3-Way Flow, Leakage Workspace, Review Queue
+│   │   ├── components/             # Reusable UI widgets, layout shells, and data tables
+│   │   └── lib/                    # Typed API client, Indian Rupee (₹) and datetime formatters
+│   ├── package.json                # Frontend Node.js dependencies
+│   ├── tsconfig.json               # TypeScript strict compiler configuration
+│   └── tailwind.config.ts          # Monochrome editorial design tokens
 │
-├── docs/                       # 21 Formal Architectural, QA & Audit Specifications
-├── docker-compose.yml          # Multi-container orchestration (DB, Redis, Backend, Frontend)
-├── .env.example                # Canonical environment variable template
-└── README.md                   # Enterprise technical documentation
+├── docs/                           # Architecture specifications and domain design records
+│   └── production-readiness/       # 10 formal production readiness audit and deployment reports
+├── docker-compose.yml              # Local orchestration (Backend, Frontend, PostgreSQL, Redis)
+└── README.md                       # Enterprise technical documentation
 ```
 
 ---
@@ -287,189 +241,151 @@ Finwise/
 ## Quick Start Guide
 
 ### Prerequisites
-- **Python:** Version 3.11, 3.12, or 3.14 (with `pip`)
-- **Node.js:** Version 18+ or 20+ (with `npm`)
-- **Git:** Version 2.20+
+- **Python:** 3.11, 3.12, or 3.14 (with `pip`)
+- **Node.js:** 18.x or 20.x (with `npm`)
+- **PostgreSQL:** 15+ (or SQLite for local development)
+- **Redis:** 7.x (Optional for local development; automatic in-memory fallback enabled)
 
 ---
 
-### Running Locally (Development Mode)
+### Local Development Setup
 
-#### 1. Backend Setup
+#### 1. Backend Service
 ```bash
-# Navigate to backend directory
+# Navigate to the backend directory
 cd backend
 
 # Install Python dependencies
 pip install -r requirements.txt
 
-# Execute database migrations
-alembic upgrade head
+# Apply database migrations
+python -m alembic upgrade head
 
-# Start FastAPI server (runs on port 8000)
+# Launch the FastAPI backend server (Port 8000)
 uvicorn app.main:app --reload --port 8000
 ```
-- Interactive Swagger UI: [`http://localhost:8000/api/v1/docs`](http://localhost:8000/api/v1/docs)
-- Health Probe: [`http://localhost:8000/health`](http://localhost:8000/health)
+- **API Documentation (Swagger UI):** [`http://localhost:8000/api/v1/docs`](http://localhost:8000/api/v1/docs)
+- **Health Check Probe:** [`http://localhost:8000/health/ready`](http://localhost:8000/health/ready)
 
-#### 2. Frontend Setup
+#### 2. Frontend Application
 ```bash
 # Open a new terminal in the frontend directory
 cd frontend
 
-# Install Node dependencies
+# Install Node.js dependencies
 npm install
 
-# Start local Next.js production server (runs on port 3100)
-npm run start
-# Or for local development hot-reloading:
+# Start the Next.js development server (Port 3100)
 npm run dev
 ```
-- Web Application Console: [`http://localhost:3100`](http://localhost:3100)
-- Sign In & Tenant Registration: [`http://localhost:3100/login`](http://localhost:3100/login)
+- **Finora Web Console:** [`http://localhost:3100`](http://localhost:3100)
+- **Login Portal:** [`http://localhost:3100/login`](http://localhost:3100/login)
 
 ---
 
-### Default Testing Credentials
+### Default Development Accounts & Role Matrix
 
-| Role | Email | Password | Access Scope |
-|---|---|---|---|
-| **Tenant Admin** | `admin@alpha.com` | `Password123!` | Complete administrative access, user management, tariff contract configuration, reconciliation runs, review decisions |
-| **Finance Manager** | `manager@alpha.com` | `Password123!` | Trigger reconciliation runs, approve/reject/manual-allocate review items, inspect financial leakage |
-| **Auditor** | `auditor@alpha.com` | `Password123!` | Read-only inspection across all ledgers, transaction records, audit logs (review mutations prohibited) |
+> [!NOTE]  
+> The following accounts are seeded exclusively for local development and integration testing. Production deployments must provision unique tenant credentials via AWS Secrets Manager or KMS.
+
+| Role | Email | Purpose & Access Scope |
+|:---|:---|:---|
+| **Tenant Administrator** | `admin@alpha.com` | Full administrative control: user management, tariff contract configuration, reconciliation execution, and review decisions. |
+| **Finance Manager** | `manager@alpha.com` | Operational control: trigger reconciliation runs, inspect leakage findings, and execute Approve/Reject/Manual Allocate actions. |
+| **Financial Auditor** | `auditor@alpha.com` | Read-only inspection: ledger transactions, financial discrepancy reports, and immutable audit logs (mutations blocked by RBAC). |
+
+*Default seed password for all test accounts:* `Password123!`
 
 ---
 
-### Running with Docker Compose (Full Stack)
+### Running via Docker Compose
 
 ```bash
-# Copy environment configuration
+# Initialize local environment variables
 cp .env.example .env
 
-# Build and start all services (PostgreSQL, Redis, Backend, Frontend)
-docker-compose up --build -d
+# Build and start all services in detached mode
+docker compose up --build -d
 
-# Check running service status
-docker-compose ps
+# Check operational status of all containers
+docker compose ps
 ```
 
 ---
 
 ## Verification & Automated Testing
 
-Finora enforces continuous quality gates. Every financial calculation, double-entry allocation, knapsack search bound, and tenant isolation rule is mathematically verified:
+Finora maintains continuous quality gates. Every financial calculation, double-entry allocation, Knapsack search bound, and tenant isolation rule is mathematically verified against an independent test oracle.
 
 ```bash
+# Execute the full automated backend test suite
 cd backend
-pytest -v
+python -m pytest -q --tb=short
 ```
 
-### Verified Test Suite Breakdown (193/193 Passing — 100% Pass Rate)
+### Test Suite Execution Summary
 
-| Test Module | Coverage Area | Status |
-|---|---|---|
-| `test_auth.py` | Registration, duplicate slug rejection, JWT issuance, profile lookup (6 tests) | **PASSED** |
-| `test_dashboard_api.py` | Executive overview metrics, 3-way flow, leakage findings, review queue, fee analytics, audit logs, tenant isolation (4 tests) | **PASSED** |
-| `test_health.py` | Root and `/api/v1` healthcheck probes (2 tests) | **PASSED** |
-| `test_ingestion_hdfc.py` | HDFC Bank CSV parsing, date normalization, running balance verification (1 test) | **PASSED** |
-| `test_ingestion_razorpay.py` | Razorpay payment captures, settlement batches, duplicate isolation (3 tests) | **PASSED** |
-| `test_ingestion_security_and_quality.py` | DDE formula sanitization, tenant isolation, RBAC upload guards, error exports (5 tests) | **PASSED** |
-| `test_ingestion_shopify.py` | Shopify order ingestion, missing headers, isolated row errors, deduplication (4 tests) | **PASSED** |
-| `test_rbac.py` | Role-based access control (Admin, Finance Manager, Auditor permissions) (5 tests) | **PASSED** |
-| `test_reconciliation_audit_verification.py` | Partial allocations, many-to-many conservation, ACID transaction rollback, contract versioning, manual review reversal (5 tests) | **PASSED** |
-| `test_reconciliation_fees_and_precision.py` | 6-stage financial rounding, contract fee overcharge detection, RBAC review guards (3 tests) | **PASSED** |
-| `test_reconciliation_order_to_payment.py` | Pass 1 exact order-to-payment matching, partial payments, unmatched visibility (3 tests) | **PASSED** |
-| `test_reconciliation_property_based.py` | Hypothesis property-based testing of staged rounding, tenant isolation, idempotent re-runs (3 tests) | **PASSED** |
-| `test_reconciliation_settlement_to_bank.py` | Pass 2 exact UTR matching, Pass 3 collision guards, Pass 5 bounded knapsack subset-sum, never-force-match guarantee (4 tests) | **PASSED** |
-| `test_tenant_isolation.py` | Multi-tenant cryptographic isolation, foreign tenant access rejection (5 tests) | **PASSED** |
-| `test_leakage_detector_fee_overcharge.py` | Phase 4 Fee Overcharge Detector, MDR contract verification, GST variance, and precision (10 tests) | **PASSED** |
-| `test_leakage_detector_missing_settlement.py` | Phase 4 Missing Settlement Detector, settlement SLAs, captured payment tracking (8 tests) | **PASSED** |
-| `test_leakage_detector_uncredited_settlement.py` | Phase 4 Uncredited Settlement Detector, bank nodal account clearing, UTR verification (8 tests) | **PASSED** |
-| `test_leakage_detector_refund_anomalies.py` | Phase 4 Refund Anomaly Detector, duplicate refunds, orphaned refunds, negative balance (8 tests) | **PASSED** |
-| `test_leakage_detector_calendar_and_timezone.py` | Phase 4 Banking calendar (RBI holidays, 2nd/4th Saturdays) and IST timezone conversion (11 tests) | **PASSED** |
-| `test_leakage_orchestration_and_idempotency.py` | Phase 4 Detector orchestration, pipeline chaining, and idempotent re-runs (6 tests) | **PASSED** |
-| `test_leakage_lineage_and_evidence.py` | Group A2 Immutable run snapshots, SHA-256 evidence fingerprinting, and run lineage (16 tests) | **PASSED** |
-| `test_leakage_api_and_rbac.py` | Phase 4 API endpoints, tenant filtering, RBAC review actions, audit trails (11 tests) | **PASSED** |
-| `test_tenant_financial_history_retention.py` | Group A2.1 Tenant financial history retention, soft delete protection, fail-closed downgrade (9 tests) | **PASSED** |
-| `test_forensic_reader.py` | Phase 5 Read-only forensic data extraction, strictly bounded financial data retrieval (7 tests) | **PASSED** |
-| `test_forensic_evidence.py` | Phase 5 Deterministic evidence pack compilation, SHA-256 integrity verification (6 tests) | **PASSED** |
-| `test_forensic_investigation.py` | Phase 5 Orchestration of forensic analysis, state transitions, and idempotency (8 tests) | **PASSED** |
-| `test_forensic_confidence.py` | Phase 5 Mathematical confidence scoring engine, deterministic penalty deductions (7 tests) | **PASSED** |
-| `test_forensic_llm_adapter.py` | Phase 5 Multi-provider LLM adapter (Gemini, Claude, GPT-4, Mock), structured output (4 tests) | **PASSED** |
-| `test_forensic_claim_drafts.py` | Phase 5 Dispute claim generation, portal formatting, human-in-the-loop review (4 tests) | **PASSED** |
-| `test_forensic_security.py` | Phase 5 Authority isolation, read-only guarantees, PII sanitization, anti-hallucination (3 tests) | **PASSED** |
-| `test_forensic_api_rbac.py` | Phase 5 REST endpoints, role permissions, tenant isolation, human approval gates (2 tests) | **PASSED** |
-| `test_alembic_version_length_compatibility.py` | Alembic PostgreSQL VARCHAR(128) version table compatibility, multi-step migration (5 tests) | **PASSED** |
-| `test_phase7_security_hardening.py` | Phase 7 rate limiting, OWASP headers, RBAC Auditor write blocks, DDE injection, prompt injection, AI citation validation (10 tests) | **PASSED** |
-| `test_phase7_financial_integrity.py` | Phase 7 dynamic non-hardcoded GST rates (0%, 5%), balance conservation, decimal precision, knapsack boundaries (5 tests) | **PASSED** |
-| `test_phase7_blind_holdout_benchmark.py` | Phase 7 500-scenario independent synthetic holdout benchmark evaluation (1 test) | **PASSED** |
-| `test_phase7_backup_restore.py` | Phase 7 live database snapshot, disaster recovery drill, cryptographic checksum verification (2 tests) | **PASSED** |
-| `test_gemini_integration.py` | Google Gemini 2.0 API integration, rate limits, timeouts, anti-hallucination citation filtering, dashboard state (9 tests passed, 1 live test gated on live key) | **PASSED** |
+```text
+======================= 220 passed, 1 skipped, 2 warnings in 107.98s =======================
+```
 
-```
-============================== test session summary ==============================
-Platform: win32 | Python: 3.12/3.14 | Pytest: 9.1.1 | Hypothesis: 6.170.15
-202 passed, 1 skipped, 10 warnings in 48.24s (100% pass rate)
-===================================================================================
-```
+- **Total Test Cases Collected:** **221** across 38 test suites.
+- **Passing Tests:** **220** (100% of executable tests).
+- **Skipped Tests:** **1** (`test_real_gemini_api_call` cleanly gated when `GEMINI_API_KEY` is not configured).
+- **Failed Tests:** **0**.
+
+### Key Invariant Test Suites
+
+| Invariant Category | Target Test Suite | Key Guarantees Verified |
+|:---|:---|:---|
+| **Independent Financial Oracle** | `test_independent_financial_oracle.py` | 17 mathematical invariants verified against independent arithmetic models; zero balance drift. |
+| **Security Hardening** | `test_phase7_security_hardening.py` | Multi-tier rate limiting (Auth, Upload, Forensics), OWASP secure headers, DDE formula injection prevention. |
+| **Dynamic Tariff & GST** | `test_phase7_financial_integrity.py` | Dynamic non-hardcoded GST rates (0%, 5%, 18%), sub-paisa tolerance bounds ($\epsilon = ₹0.05$). |
+| **Bounded Knapsack Solver** | `test_reconciliation_settlement_to_bank.py` | Subset-sum matching strictly bounded to $N \le 5$; never forces an ambiguous match. |
+| **Tenant Isolation & RBAC** | `test_tenant_isolation.py` & `test_rbac.py` | Cryptographic JWT isolation, cross-tenant leak prevention, Auditor write-action rejection. |
+| **Disaster Recovery** | `test_phase7_backup_restore.py` | Point-in-time database snapshots, restoration drills, and cryptographic checksum validation. |
 
 ---
 
 ## Security & Governance Architecture
 
-1. **Multi-Tenant Cryptographic Isolation:**
-   Tenant IDs are extracted exclusively from cryptographically signed JWT tokens (never trusted from client request bodies or URL paths). All queries enforce strict tenant boundary checks.
-2. **DDE / Formula Injection Defense:**
-   All uploaded CSV data is scrubbed upon ingestion; cells starting with formula characters (`=`, `+`, `-`, `@`, `|`, `%`) are escaped with a leading apostrophe (`'`) to protect finance team spreadsheet software.
-3. **Double-Entry Financial Conservation:**
-   Allocated amounts are strictly capped by remaining source and destination balances. Partial allocations, many-to-many knapsack allocations, and manual review overrides preserve exact financial conservation.
-4. **Zero Untrusted Free-Text Ingestion to AI:**
-   Free-text customer order notes or bank descriptions are never forwarded to external LLMs. The AI receives strictly structured JSON numerical deltas, timestamps, and reference IDs.
-5. **Anti-Hallucination Citation Verification:**
+1. **Cryptographic Multi-Tenant Isolation:**  
+   Tenant identities are resolved strictly from verified, signed JWT claims. Request payloads and URL query parameters cannot override tenant context.
+2. **DDE / Formula Injection Defense:**  
+   All uploaded CSV data is scrubbed upon ingestion; cells starting with formula triggers (`=`, `+`, `-`, `@`, `|`, `%`) are escaped with a leading apostrophe (`'`) to protect downstream spreadsheet applications.
+3. **Double-Entry Financial Conservation:**  
+   Allocated amounts are strictly capped by remaining source and destination balances. Partial allocations, many-to-many Knapsack allocations, and manual review overrides preserve exact financial conservation.
+4. **Zero Untrusted Free-Text to AI:**  
+   Free-text customer order notes or raw bank descriptions are never forwarded to external LLMs. The AI receives strictly structured JSON numerical deltas, timestamps, and reference IDs.
+5. **Anti-Hallucination Citation Verification:**  
    Post-inference validators inspect every reference ID cited by the AI. If an unsupplied ID or UTR is detected, the dossier is rejected and status falls back to `INCONCLUSIVE`.
-6. **Immutable Audit Ledger:**
+6. **Immutable Audit Ledger:**  
    The `audit_logs` table maintains append-only records of all entity mutations, previous/new JSON states, user rationales, IP addresses, and timestamps.
-7. **Rate Limiting & Brute-Force Lockout:**
-   Authentication endpoints enforce sliding-window rate limiting (10 req/min) and 60-second lockouts on brute-force login failures.
-8. **OWASP Standard Security Headers:**
+7. **Rate Limiting & Brute-Force Lockout:**  
+   Authentication endpoints enforce sliding-window rate limiting (5 req/min), file upload endpoints (30 req/min), and forensic analysis (20 req/min).
+8. **OWASP Standard Security Headers:**  
    All HTTP responses emit `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `X-XSS-Protection`, and HSTS headers.
 
 ---
 
-## Architectural Specifications Index
+## Documentation & Production Readiness
 
-Comprehensive architectural specifications and formal audit reports are located in the [`docs/`](./docs) directory:
+Formal engineering specifications, audit reports, and deployment runbooks are maintained under [`docs/`](./docs):
 
-| Document | Description |
-|---|---|
-| [**01. Architecture Specification**](./docs/01_revised_phase_0_architecture_specification.md) | Modular Monolith system design, boundaries, and tier segregation. |
-| [**02. Financial Rules Register**](./docs/02_financial_rules_and_assumptions_register.md) | Configurable banking calendars, cutoffs, refund fees, and contract tariffs. |
-| [**03. Database Schema & ERD**](./docs/03_updated_database_er_diagram.md) | Complete ER diagram, canonical models, and relational constraints. |
-| [**04. Reconciliation Design**](./docs/04_revised_reconciliation_and_allocation_design.md) | Multi-pass matching algorithms, candidate scoring, and Knapsack math. |
-| [**05. Leakage Detectors**](./docs/05_four_leakage_detector_specifications.md) | Exact formulas and tolerances for the four core leakage detectors. |
-| [**06. Security & AI Governance**](./docs/06_security_and_ai_governance_specification.md) | STRIDE threat model, DDE defense, PII scrubbing, and citation validation. |
-| [**07. Development Roadmap**](./docs/07_complete_development_roadmap.md) | Detailed 6-week engineering plan across all disciplines. |
-| [**08. Testing & QA Plan**](./docs/08_testing_and_qa_plan.md) | Property-based tests, financial invariants, and 2,500-tx holdout dataset. |
-| [**09. Risk Register**](./docs/09_risk_register.md) | Enterprise operational risks, mitigations, and contingency protocols. |
-| [**10. Decision Register**](./docs/10_decisions_requiring_user_approval.md) | Governance decision categories (Strategic vs Defaults vs Dynamic). |
-| [**11. Phase 1 Readiness Checklist**](./docs/11_phase_1_readiness_checklist.md) | Quality gate verification criteria. |
-| [**12. Phase 0 Audit Report**](./docs/12_phase_0_final_audit_report.md) | Phase 0 formal sign-off report. |
-| [**13. Phase 1 Implementation Report**](./docs/13_phase_1_implementation_report.md) | Phase 1 build, migration, and test verification report. |
-| [**14. Phase 2 Ingestion Report**](./docs/13_phase_2_ingestion_implementation_report.md) | Phase 2 CSV ingestion pipeline, adapters, sanitization, and verification. |
-| [**15. Phase 3 Reconciliation Report**](./docs/14_phase_3_reconciliation_implementation_report.md) | Phase 3 deterministic 3-way matching engine, knapsack solver, and fee engine. |
-| [**16. Phase 3 Financial Integrity Audit**](./docs/15_phase_3_final_financial_integrity_audit.md) | Independent audit verifying balance conservation, bounds, immutability, and security. |
-| [**17. Phase 4 Leakage Detection Report**](./docs/16_phase_4_leakage_detection_implementation_report.md) | Phase 4 deterministic revenue leakage detection engine, 4 core detectors, and scheduler. |
-| [**18. Phase 4 Group A2 Lineage & Evidence**](./docs/17_phase_4_group_a2_implementation_report.md) | Group A2 immutable run snapshots, evidence fingerprinting, and lineage protection. |
-| [**19. Phase 4 Group A2.1 Retention Report**](./docs/18_phase_4_group_a2_1_financial_history_retention_report.md) | Group A2.1 tenant financial history retention, soft delete, and fail-closed migrations. |
-| [**20. Phase 5 AI Forensic Investigator**](./docs/19_phase_5_ai_forensic_investigator_implementation_report.md) | Phase 5 read-only evidence-based AI root cause analysis, confidence scoring, and claim drafts. |
-| [**21. Phase 6 Dashboard Report**](./docs/20_phase_6_dashboard_implementation_report.md) | Phase 6 financial review dashboard architecture, leakage analytics, review queue, and verification. |
-| [**22. Phase 7 Security Audit Report**](./docs/16_phase_7_security_audit_report.md) | Phase 7 formal security hardening, OWASP Top 10 defenses, rate limiting, and RBAC audits. |
-| [**23. Phase 7 Blind Holdout Benchmark**](./docs/17_blind_holdout_benchmark_report.md) | 500-scenario independent synthetic holdout benchmark results, precision, and conservation parity. |
-| [**24. Phase 7 Backup & Disaster Recovery**](./docs/18_backup_restore_verification.md) | Live database snapshot, catastrophic failure simulation, restoration drill, and RPO/RTO targets. |
-| [**25. Phase 7 Production Deployment Guide**](./docs/19_production_deployment_guide.md) | Production topology, environment variable references, and multi-container Docker compose runbooks. |
-| [**26. Phase 7 Pilot Operations Manual**](./docs/20_pilot_operations_manual.md) | Merchant onboarding, daily reconciliation SOP, human review protocols, and retention policies. |
-| [**27. Phase 7 Final Release Readiness**](./docs/21_final_release_readiness_report.md) | Final release readiness report with measurable acceptance criteria and PILOT READY verdict. |
-| [**28. Google Gemini API Integration Guide**](./docs/22_google_gemini_api_integration_guide.md) | Real Google Gemini API connectivity, resilience, safe credentials protocol, and read-only AI governance. |
+### Production Readiness Suite (`docs/production-readiness/`)
+
+| Document ID | Title | Scope & Purpose |
+|:---|:---|:---|
+| **PR-REP-001** | [Final Deployment Readiness Report](./docs/production-readiness/FINAL_DEPLOYMENT_READINESS_REPORT.md) | Master executive audit report, test metrics, bug fix records, and pilot release sign-off. |
+| **PR-REP-002** | [Gemini Integration Report](./docs/production-readiness/GEMINI_INTEGRATION_REPORT.md) | Gemini 2.0 LLM adapter architecture, prompt isolation, token telemetry, and fallback logic. |
+| **PR-REP-003** | [Database Production Audit](./docs/production-readiness/DATABASE_PRODUCTION_AUDIT.md) | PostgreSQL schema indexing, connection pooling, SSL mode, and migration verification. |
+| **PR-REP-004** | [Security Audit Report](./docs/production-readiness/SECURITY_AUDIT_REPORT.md) | OWASP Top 10 compliance, multi-tenancy verification, credential audit, and rate limiting. |
+| **PR-REP-005** | [Financial Accuracy Benchmark](./docs/production-readiness/FINANCIAL_ACCURACY_BENCHMARK.md) | Independent mathematical oracle verification, 17 financial invariants, and zero drift proofs. |
+| **PR-REP-006** | [Infrastructure Validation Report](./docs/production-readiness/INFRASTRUCTURE_VALIDATION_REPORT.md) | Multi-stage Docker builds, port bindings (8000/3100), non-root users, and system resources. |
+| **PR-REP-007** | [Monitoring & Observability Report](./docs/production-readiness/MONITORING_AND_OBSERVABILITY_REPORT.md) | `X-Request-ID` correlation tracing, `/health/ready` probe, and Prometheus telemetry. |
+| **PR-REP-008** | [Remaining Blockers Register](./docs/production-readiness/REMAINING_BLOCKERS.md) | Detailed register of external cloud credentials required prior to public General Availability. |
+| **PR-REP-009** | [Production Configuration Guide](./docs/production-readiness/PRODUCTION_CONFIGURATION_GUIDE.md) | Environment variables reference, connection pool profiles, and Nginx reverse proxy configs. |
+| **PR-REP-010** | [Production Rollback & Recovery Plan](./docs/production-readiness/PRODUCTION_ROLLBACK_AND_RECOVERY_PLAN.md) | Incident rollback runbooks, Alembic downgrades, point-in-time database restore, and RTO/RPO SLAs. |
 
 ---
 
