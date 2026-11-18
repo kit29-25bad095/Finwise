@@ -26,6 +26,10 @@ wheels/
 
 # Virtual Environments
 .env
+.env.local
+.env.*.local
+*.pem
+*.key
 .venv
 env/
 venv/

@@ -51,11 +51,11 @@ ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
 
 # Database Configuration (Managed PostgreSQL)
-DATABASE_URL=postgresql://finora_user:StrongSecurePassword123!@postgres.internal:5432/finora_prod
-SYNC_DATABASE_URL=postgresql://finora_user:StrongSecurePassword123!@postgres.internal:5432/finora_prod
+DATABASE_URL=postgresql://finora_user:<REPLACE_WITH_SECURE_PASSWORD>@postgres.internal:5432/finora_prod
+SYNC_DATABASE_URL=postgresql://finora_user:<REPLACE_WITH_SECURE_PASSWORD>@postgres.internal:5432/finora_prod
 
 # Redis & RQ Worker Cluster
-REDIS_URL=redis://:RedisAuthToken456!@redis.internal:6379/0
+REDIS_URL=redis://:<REPLACE_WITH_REDIS_AUTH_TOKEN>@redis.internal:6379/0
 WORKER_FALLBACK_SYNC=false
 
 # Google Gemini AI Forensic Gateway (Optional / Configurable)

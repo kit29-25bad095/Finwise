@@ -1,3 +1,4 @@
+import uuid
 from fastapi import FastAPI, status, Depends, Request, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -27,10 +28,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# OWASP Security Headers Middleware
+# Request Correlation ID & OWASP Security Headers Middleware
 @app.middleware("http")
 async def security_headers_middleware(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    request.state.request_id = request_id
     response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
