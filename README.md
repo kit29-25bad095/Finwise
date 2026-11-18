@@ -294,7 +294,7 @@ npm run dev
 | **Finance Manager** | `manager@alpha.com` | Operational control: trigger reconciliation runs, inspect leakage findings, and execute Approve/Reject/Manual Allocate actions. |
 | **Financial Auditor** | `auditor@alpha.com` | Read-only inspection: ledger transactions, financial discrepancy reports, and immutable audit logs (mutations blocked by RBAC). |
 
-*Default seed password for all test accounts:* `Password123!`
+*Default seed password:* Set during local database seeding (e.g., via `SEED_ADMIN_PASSWORD` in your local `.env`).
 
 ---
 
