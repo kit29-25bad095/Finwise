@@ -57,8 +57,10 @@ def handle_client(conn, addr):
                         conn.sendall(b"+" + arg + b"\r\n")
                     else:
                         conn.sendall(b"+PONG\r\n")
-                elif main_cmd in (b"AUTH", b"SELECT", b"QUIT", b"CLIENT"):
+                elif main_cmd in (b"AUTH", b"SELECT", b"QUIT", b"CLIENT", b"MULTI"):
                     conn.sendall(b"+OK\r\n")
+                elif main_cmd == b"EXEC":
+                    conn.sendall(b"*5\r\n:1\r\n:1\r\n:1\r\n:1\r\n:1\r\n")
                 elif main_cmd == b"INFO":
                     info = b"redis_version:7.2.0\r\nos:Windows\r\nrole:master\r\n"
                     conn.sendall(b"$" + str(len(info)).encode() + b"\r\n" + info + b"\r\n")
