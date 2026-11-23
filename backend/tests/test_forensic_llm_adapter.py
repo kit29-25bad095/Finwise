@@ -1,4 +1,5 @@
 import pytest
+from app.core.config import settings
 from app.services.forensics.llm_adapter import (
     BaseLLMAdapter,
     GeminiLLMAdapter,
@@ -43,7 +44,9 @@ async def test_mock_llm_adapter_simulated_error():
 
 
 @pytest.mark.asyncio
-async def test_gemini_llm_adapter_missing_api_key():
+async def test_gemini_llm_adapter_missing_api_key(monkeypatch):
+    monkeypatch.setattr(settings, "AI_API_KEY", None)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     adapter = GeminiLLMAdapter(api_key=None)
     with pytest.raises(LLMProviderError, match="UNVERIFIED"):
         await adapter.generate_investigation(system_prompt="sys", user_prompt="usr")

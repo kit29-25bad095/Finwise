@@ -1,3 +1,4 @@
+import os
 import uuid
 import csv
 import io
@@ -7,6 +8,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, desc
 
+from app.core.config import settings
 from app.core.database import get_db_session as get_db
 from app.core.rbac import Role
 from app.api.deps import get_current_user, get_current_tenant_membership, RoleChecker
@@ -35,6 +37,9 @@ from app.workers.ingestion_tasks import process_ingestion_job
 router = APIRouter(prefix="/ingestion", tags=["Data Ingestion & Normalization"])
 
 
+ALLOWED_UPLOAD_EXTENSIONS = {".csv", ".tsv", ".txt"}
+
+
 @router.post(
     "/upload",
     response_model=IngestionBatchResponse,
@@ -50,7 +55,34 @@ async def upload_csv_file(
 ):
     tenant_id = membership.tenant_id
 
-    file_bytes = await file.read()
+    # 1. Filename & extension validation
+    filename = file.filename or "unknown.csv"
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in ALLOWED_UPLOAD_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid file extension '{ext}'. Only CSV and TSV files (.csv, .tsv, .txt) are accepted for ingestion."
+        )
+
+    # 2. Bounded streaming read with size check (mitigates OOM / zip-bomb style attacks)
+    max_bytes = settings.MAX_UPLOAD_SIZE_BYTES
+    chunk_size = 1024 * 1024  # 1MB chunks
+    chunks = []
+    total_size = 0
+
+    while True:
+        chunk = await file.read(chunk_size)
+        if not chunk:
+            break
+        total_size += len(chunk)
+        if total_size > max_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"Uploaded file exceeds maximum allowed size of {max_bytes // (1024 * 1024)}MB."
+            )
+        chunks.append(chunk)
+
+    file_bytes = b"".join(chunks)
     if not file_bytes:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -63,9 +95,10 @@ async def upload_csv_file(
             tenant_id=tenant_id,
             user_id=current_user.id,
             source_type=source_type,
-            filename=file.filename or "unknown.csv",
+            filename=filename,
             file_bytes=file_bytes,
         )
+
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 

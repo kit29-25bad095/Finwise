@@ -1,7 +1,7 @@
 import re
 from pathlib import Path
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, Table, MetaData, Column, String
 from sqlalchemy.schema import CreateTable
 from sqlalchemy.dialects import postgresql, sqlite
 from alembic.config import Config
@@ -117,8 +117,8 @@ def test_fresh_migration_from_001_through_007(tmp_path, monkeypatch):
 
         # Check recorded version
         current_rev = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
-        assert current_rev == "007_phase5_forensic_investigations"
-        assert len(current_rev) == 34
+        assert current_rev in ("007_phase5_forensic_investigations", "008_forensic_investigation_leases_and_outbox")
+        assert len(current_rev) <= 128
     eng.dispose()
 
 
@@ -158,3 +158,95 @@ def test_stepwise_recording_revisions_005_006_007(tmp_path, monkeypatch):
         assert rev_007 == "007_phase5_forensic_investigations"
         assert len(rev_007) == 34
     eng.dispose()
+
+
+def test_ensure_version_column_capacity_untransacted_connection_does_not_leak_transaction():
+    """
+    Verifies that calling ensure_version_column_capacity on an idle/untransacted
+    connection does NOT leave an unintended active transaction open.
+    """
+    engine = create_engine("sqlite:///:memory:")
+    with engine.connect() as conn:
+        orig_dialect = conn.dialect.name
+        conn.dialect.name = "postgresql"
+        try:
+            assert not conn.in_transaction(), "Precondition: Connection must not be in transaction"
+            ensure_version_column_capacity(conn, length=128)
+            assert not conn.in_transaction(), "Postcondition: Must not leave unintended transaction active"
+        finally:
+            conn.dialect.name = orig_dialect
+    engine.dispose()
+
+
+def test_ensure_version_column_capacity_inside_transaction_preserves_ownership():
+    """
+    Verifies that when ensure_version_column_capacity is called within an active
+    transaction (such as Alembic's context.begin_transaction()), it participates
+    in the transaction without committing prematurely or rolling back.
+    """
+    engine = create_engine("sqlite:///:memory:")
+    with engine.connect() as conn:
+        orig_dialect = conn.dialect.name
+        conn.dialect.name = "postgresql"
+        try:
+            with conn.begin():
+                assert conn.in_transaction(), "Must be in transaction"
+                ensure_version_column_capacity(conn, length=128)
+                assert conn.in_transaction(), "Must remain in transaction under caller ownership"
+            assert not conn.in_transaction(), "Transaction committed cleanly by caller"
+        finally:
+            conn.dialect.name = orig_dialect
+    engine.dispose()
+
+
+def test_ensure_version_column_capacity_alters_narrow_column():
+    """
+    Verifies that if alembic_version exists with a narrower column (e.g. VARCHAR(32)),
+    ensure_version_column_capacity executes the ALTER TABLE statement.
+    """
+    engine = create_engine("sqlite:///:memory:")
+    metadata = MetaData()
+    Table("alembic_version", metadata, Column("version_num", String(32), primary_key=True))
+    metadata.create_all(engine)
+
+    executed_ddl = []
+    with engine.connect() as conn:
+        orig_dialect = conn.dialect.name
+        conn.dialect.name = "postgresql"
+        real_exec = conn.execute
+        conn.execute = lambda stmt, *args, **kwargs: executed_ddl.append(str(stmt))
+        try:
+            with conn.begin():
+                ensure_version_column_capacity(conn, length=128)
+            assert len(executed_ddl) == 1
+            assert "ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(128)" in executed_ddl[0]
+        finally:
+            conn.execute = real_exec
+            conn.dialect.name = orig_dialect
+    engine.dispose()
+
+
+def test_ensure_version_column_capacity_skips_when_already_wide():
+    """
+    Verifies that if alembic_version already has VARCHAR(128) or wider,
+    ensure_version_column_capacity does NOT execute redundant ALTER TABLE DDL.
+    """
+    engine = create_engine("sqlite:///:memory:")
+    metadata = MetaData()
+    Table("alembic_version", metadata, Column("version_num", String(128), primary_key=True))
+    metadata.create_all(engine)
+
+    executed_ddl = []
+    with engine.connect() as conn:
+        orig_dialect = conn.dialect.name
+        conn.dialect.name = "postgresql"
+        real_exec = conn.execute
+        conn.execute = lambda stmt, *args, **kwargs: executed_ddl.append(str(stmt))
+        try:
+            with conn.begin():
+                ensure_version_column_capacity(conn, length=128)
+            assert len(executed_ddl) == 0, "No ALTER TABLE should be executed when column is already VARCHAR(128)"
+        finally:
+            conn.execute = real_exec
+            conn.dialect.name = orig_dialect
+    engine.dispose()

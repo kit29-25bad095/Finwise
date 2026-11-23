@@ -42,11 +42,14 @@ from app.models.leakage import (
 from app.models.forensic import (
     ForensicInvestigation,
     ForensicClaimDraft,
+    ForensicDispatchOutbox,
     InvestigationStatus,
     InvestigationConclusion,
     InvestigationConfidence,
     ClaimDraftStatus,
     ClaimDraftReviewStatus,
+    OutboxDispatchStatus,
+    OutboxEventType,
 )
 
 __all__ = [
@@ -92,9 +95,12 @@ __all__ = [
     "ImmutabilityViolationError",
     "ForensicInvestigation",
     "ForensicClaimDraft",
+    "ForensicDispatchOutbox",
     "InvestigationStatus",
     "InvestigationConclusion",
     "InvestigationConfidence",
     "ClaimDraftStatus",
     "ClaimDraftReviewStatus",
+    "OutboxDispatchStatus",
+    "OutboxEventType",
 ]

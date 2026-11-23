@@ -15,17 +15,24 @@ security_scheme = HTTPBearer(auto_error=False)
 
 
 def get_current_user(
+    request: Request,
     auth: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
     session: Session = Depends(get_db_session)
 ) -> User:
-    if not auth or not auth.credentials:
+    token: Optional[str] = None
+    if auth and auth.credentials:
+        token = auth.credentials
+    elif request.cookies.get("access_token"):
+        token = request.cookies.get("access_token")
+
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication credentials were not provided.",
             headers={"WWW-Authenticate": "Bearer"}
         )
 
-    payload = decode_access_token(auth.credentials)
+    payload = decode_access_token(token)
     if not payload or "sub" not in payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -63,8 +70,14 @@ def get_current_tenant_membership(
 ) -> TenantMembership:
     target_tenant_id: Optional[uuid.UUID] = None
 
+    token: Optional[str] = None
     if auth and auth.credentials:
-        payload = decode_access_token(auth.credentials)
+        token = auth.credentials
+    elif request.cookies.get("access_token"):
+        token = request.cookies.get("access_token")
+
+    if token:
+        payload = decode_access_token(token)
         if payload and payload.get("tenant_id"):
             try:
                 target_tenant_id = uuid.UUID(payload["tenant_id"])

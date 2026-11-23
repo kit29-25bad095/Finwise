@@ -86,15 +86,30 @@ class ClaimDraftService:
         )
         target_ref = exc.source_reference
 
-        # 4. Extract Verified Facts and Evidence References from Investigation Bundle
+        # 4. Extract Deterministic Supporting Facts and Verified Evidence References
+        # Strict Grounding Rule: Authoritative dispute claim supporting facts are derived
+        # strictly from deterministic exception, run, and financial records.
+        deterministic_supporting_facts: List[str] = [
+            f"Exception type: {exc.exception_type}",
+            f"Detector: {exc.detector_type}",
+            f"Source reference: {target_ref}",
+            f"Target entity: {resolved_target}",
+            f"Disputed amount: {currency} {dispute_amount:.4f}",
+        ]
+        if exc.detection_run_id:
+            deterministic_supporting_facts.append(f"Detection run reference: {exc.detection_run_id}")
+
+        # Retain AI-generated observations only if explicitly demarcated as unverified advisory notes
         inv_result = inv.investigation_result or {}
-        verified_facts = inv_result.get("verified_facts", [])
-        if not verified_facts:
-            verified_facts = [
-                f"Exception type: {exc.exception_type}",
-                f"Source reference: {exc.source_reference}",
-                f"Disputed amount: {currency} {dispute_amount:.4f}",
-            ]
+        raw_ai_facts = inv_result.get("verified_facts")
+        if isinstance(raw_ai_facts, list):
+            for fact in raw_ai_facts:
+                if isinstance(fact, str) and fact.strip():
+                    deterministic_supporting_facts.append(
+                        f"[AI Observation — Unverified]: {fact.strip()}"
+                    )
+
+        supporting_facts = deterministic_supporting_facts
 
         bundle_snapshot = inv.evidence_bundle_snapshot or {}
         evidence_items = bundle_snapshot.get("evidence_items", [])
@@ -147,7 +162,7 @@ class ClaimDraftService:
             target_entity=resolved_target,
             target_reference=target_ref,
             claim_summary=claim_summary,
-            supporting_facts=verified_facts,
+            supporting_facts=supporting_facts,
             evidence_references=evidence_refs,
             unresolved_questions=unresolved_questions,
             required_attachments=recommended_attachments,

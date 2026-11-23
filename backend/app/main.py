@@ -1,11 +1,44 @@
+import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, status, Depends
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db_session
-from app.api.v1 import auth, tenants, ingestion, reconciliation, leakage, forensic
+from app.core.middleware import SecurityHeadersMiddleware
+from app.core.rate_limit import RateLimitMiddleware
+from app.core.monitoring.logging import configure_structured_logging
+from app.core.monitoring.middleware import ObservabilityMiddleware
+from app.api.v1 import auth, tenants, ingestion, reconciliation, leakage, forensic, monitoring
+
+logger = logging.getLogger("finora.main")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: configure structured logging
+    configure_structured_logging(environment=settings.ENVIRONMENT)
+    logger.info("Finora Financial Engine starting up in %s environment...", settings.ENVIRONMENT)
+    yield
+    # Graceful Shutdown: close database pools and redis client cleanly
+    logger.info("Finora Financial Engine shutting down...")
+    try:
+        from app.core.database import engine
+        engine.dispose()
+        logger.info("Database connection pool cleanly disposed.")
+    except Exception as e:
+        logger.warning("Error disposing database engine pool during shutdown: %s", e)
+    try:
+        from app.workers.queue import _redis_client
+        if _redis_client is not None:
+            _redis_client.close()
+            logger.info("Redis client connection cleanly closed.")
+    except Exception as e:
+        logger.warning("Error closing Redis client during shutdown: %s", e)
+
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -13,17 +46,39 @@ app = FastAPI(
     version="1.0.0",
     docs_url=f"{settings.API_V1_STR}/docs",
     redoc_url=f"{settings.API_V1_STR}/redoc",
-    openapi_url=f"{settings.API_V1_STR}/openapi.json"
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    lifespan=lifespan,
 )
 
-# CORS Middleware
+# 1. Observability Middleware (Correlation ID, Latency, Metrics, Unhandled Exception Protection)
+app.add_middleware(ObservabilityMiddleware)
+
+# 2. Rate Limiting Middleware (Tiered sliding-window brute-force and abuse protection)
+app.add_middleware(RateLimitMiddleware)
+
+# 3. Security Headers Middleware (CSP, HSTS, X-Content-Type-Options, Frame-Options, etc.)
+app.add_middleware(SecurityHeadersMiddleware)
+
+# 4. CORS Middleware (Production allowlist with restricted methods and explicit headers)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "Origin",
+        "X-Requested-With",
+        "X-Tenant-ID",
+        "X-Correlation-ID",
+        "X-RateLimit-Limit",
+        "X-RateLimit-Remaining",
+        "Retry-After",
+    ],
 )
+
 
 # Register API Routers
 app.include_router(auth.router, prefix=settings.API_V1_STR)
@@ -32,6 +87,70 @@ app.include_router(ingestion.router, prefix=settings.API_V1_STR)
 app.include_router(reconciliation.router, prefix=settings.API_V1_STR)
 app.include_router(leakage.router, prefix=settings.API_V1_STR)
 app.include_router(forensic.router, prefix=settings.API_V1_STR)
+app.include_router(monitoring.router)
+
+
+@app.get("/health/live", status_code=status.HTTP_200_OK, tags=["System"])
+@app.get(f"{settings.API_V1_STR}/health/live", status_code=status.HTTP_200_OK, tags=["System"])
+def liveness():
+    """Liveness probe: verifies process is alive and event loop responds."""
+    return {
+        "status": "ALIVE",
+        "service": "Finora Financial Engine",
+        "version": "1.0.0",
+        "environment": settings.ENVIRONMENT,
+    }
+
+
+@app.get("/health/ready", tags=["System"])
+@app.get(f"{settings.API_V1_STR}/health/ready", tags=["System"])
+def readiness(db: Session = Depends(get_db_session)):
+    """
+    Readiness probe: verifies essential backing services (PostgreSQL and Redis).
+    Returns HTTP 200 if all backing dependencies are healthy.
+    Returns HTTP 503 if any required service is unreachable or degraded.
+    """
+    dependencies = {}
+    is_healthy = True
+
+    # 1. Database connectivity check
+    try:
+        db.execute(text("SELECT 1"))
+        dependencies["database"] = "HEALTHY"
+    except Exception as e:
+        dependencies["database"] = f"UNHEALTHY: {str(e)}"
+        is_healthy = False
+
+    # 2. Redis queue connectivity check
+    try:
+        from app.workers.queue import get_redis_client
+        client = get_redis_client()
+        if client:
+            client.ping()
+            dependencies["redis"] = "HEALTHY"
+        elif settings.ENVIRONMENT == "test":
+            dependencies["redis"] = "SKIPPED_TEST"
+        elif not settings.WORKER_FALLBACK_SYNC or settings.ENVIRONMENT == "production":
+            dependencies["redis"] = "UNAVAILABLE"
+            is_healthy = False
+        else:
+            dependencies["redis"] = "FALLBACK_SYNC_LOCAL"
+    except Exception as e:
+        if settings.ENVIRONMENT == "production" or not settings.WORKER_FALLBACK_SYNC:
+            dependencies["redis"] = f"UNHEALTHY: {str(e)}"
+            is_healthy = False
+        else:
+            dependencies["redis"] = f"DEGRADED_FALLBACK: {str(e)}"
+
+    resp_payload = {
+        "status": "READY" if is_healthy else "NOT_READY",
+        "service": "Finora Financial Engine",
+        "version": "1.0.0",
+        "environment": settings.ENVIRONMENT,
+        "dependencies": dependencies,
+    }
+    status_code = status.HTTP_200_OK if is_healthy else status.HTTP_503_SERVICE_UNAVAILABLE
+    return JSONResponse(status_code=status_code, content=resp_payload)
 
 
 @app.get("/health", status_code=status.HTTP_200_OK, tags=["System"])

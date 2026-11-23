@@ -258,6 +258,8 @@ class ReconciliationService:
         for s in settlements:
             if s.id in matched_settlements_set:
                 continue
+            if (s.status or "").strip().lower() in ("failed", "cancelled", "reversed"):
+                continue
 
             s_utr = (s.utr_number or "").strip()
             if not s_utr:
@@ -337,6 +339,8 @@ class ReconciliationService:
         # -------------------------------------------------------------------
         for s in settlements:
             if s.id in matched_settlements_set or s.unallocated_balance <= Decimal("0.0000"):
+                continue
+            if (s.status or "").strip().lower() in ("failed", "cancelled", "reversed"):
                 continue
 
             s_date = s.settled_at.date() if hasattr(s.settled_at, "date") else s.settled_at
@@ -469,6 +473,8 @@ class ReconciliationService:
         for s in settlements:
             if s.id in matched_settlements_set or s.unallocated_balance <= Decimal("0.0000"):
                 continue
+            if (s.status or "").strip().lower() in ("failed", "cancelled", "reversed"):
+                continue
 
             available_bank_txs = [
                 b for b in bank_txs
@@ -569,6 +575,7 @@ class ReconciliationService:
             unallocated_settlements = [
                 s for s in settlements
                 if s.id not in matched_settlements_set and s.unallocated_balance > Decimal("0.0000")
+                and (s.status or "").strip().lower() not in ("failed", "cancelled", "reversed")
             ]
             if len(unallocated_settlements) < 2:
                 continue
@@ -784,6 +791,16 @@ class ReconciliationService:
             if has_exceptions
             else ReconciliationStatus.COMPLETED.value
         )
+
+        # SRE Monitoring Metrics
+        try:
+            from app.core.monitoring.metrics import metrics_collector
+            metrics_collector.record_reconciliation_run(
+                matches_count=(run.matched_orders_count or 0) + (run.matched_payments_count or 0) + (run.matched_settlements_count or 0),
+                leakage_counts_by_type={}
+            )
+        except Exception:
+            pass
 
         # Deactivate / Supersede previous active runs for this tenant
         previous_runs = db.execute(

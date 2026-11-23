@@ -2,6 +2,7 @@ import uuid
 from decimal import Decimal
 from enum import Enum
 from typing import Optional, List, Dict, Any
+import sqlalchemy as sa
 from sqlalchemy import (
     Column,
     String,
@@ -16,6 +17,9 @@ from sqlalchemy import (
     UniqueConstraint,
     CheckConstraint,
     event,
+    inspect,
+    select,
+    func,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -54,6 +58,18 @@ class ClaimDraftReviewStatus(str, Enum):
     PENDING_HUMAN_REVIEW = "PENDING_HUMAN_REVIEW"
     REVIEWED_APPROVED = "REVIEWED_APPROVED"
     REVIEWED_REJECTED = "REVIEWED_REJECTED"
+
+
+class OutboxDispatchStatus(str, Enum):
+    PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
+    PUBLISHED = "PUBLISHED"
+    FAILED = "FAILED"
+
+
+class OutboxEventType(str, Enum):
+    INVESTIGATION_DISPATCH = "INVESTIGATION_DISPATCH"
+    INVESTIGATION_RECOVERY = "INVESTIGATION_RECOVERY"
 
 
 # ---------------------------------------------------------------------------
@@ -111,6 +127,13 @@ class ForensicInvestigation(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # Error Tracking (if FAILED or BLOCKED)
     error_message = Column(Text, nullable=True)
 
+    # Worker Lease Management & Recovery (Phase 5.1-D.1)
+    lease_owner_id = Column(String(100), nullable=True)
+    lease_token = Column(UUID(as_uuid=True), nullable=True)
+    lease_expires_at = Column(DateTime(timezone=True), nullable=True)
+    attempt_count = Column(Integer, nullable=False, server_default="0", default=0)
+    last_heartbeat_at = Column(DateTime(timezone=True), nullable=True)
+
     # Provenance
     created_by_user_id = Column(
         UUID(as_uuid=True),
@@ -132,6 +155,7 @@ class ForensicInvestigation(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         Index("ix_forensic_inv_tenant_exc", "tenant_id", "exception_id"),
         Index("ix_forensic_inv_tenant_run", "tenant_id", "detection_run_id"),
         Index("ix_forensic_inv_idempotency", "tenant_id", "idempotency_key"),
+        Index("ix_forensic_inv_lease_recovery", "status", "lease_expires_at"),
     )
 
 
@@ -223,17 +247,131 @@ class ForensicClaimDraft(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
 
 # ---------------------------------------------------------------------------
+# Forensic Dispatch Outbox Model (Transactional Outbox)
+# ---------------------------------------------------------------------------
+
+class ForensicDispatchOutbox(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """
+    Transactional outbox recording durable asynchronous dispatch and recovery intent
+    co-committed with investigation lifecycle state.
+    """
+    __tablename__ = "forensic_dispatch_outbox"
+
+    tenant_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("tenants.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True
+    )
+    investigation_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("forensic_investigations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    event_type = Column(String(50), nullable=False)
+    idempotency_key = Column(String(150), nullable=False, unique=True, index=True)
+    expected_prior_token = Column(UUID(as_uuid=True), nullable=True)
+    payload_version = Column(String(20), nullable=False, default="v1.0")
+    dispatch_status = Column(
+        String(30),
+        nullable=False,
+        default=OutboxDispatchStatus.PENDING.value,
+        index=True
+    )
+    attempt_count = Column(Integer, nullable=False, default=0)
+    available_at = Column(DateTime(timezone=True), nullable=False, server_default=sa.func.now())
+    published_at = Column(DateTime(timezone=True), nullable=True)
+    lease_owner_id = Column(String(100), nullable=True)
+    lease_expires_at = Column(DateTime(timezone=True), nullable=True)
+    last_error = Column(Text, nullable=True)
+
+    # Relationships
+    investigation = relationship("ForensicInvestigation")
+
+    __table_args__ = (
+        Index("ix_outbox_pending_available", "dispatch_status", "available_at"),
+        Index("ix_outbox_tenant_status", "tenant_id", "dispatch_status"),
+    )
+
+
+# ---------------------------------------------------------------------------
 # SQLAlchemy Immutability Event Listeners
 # ---------------------------------------------------------------------------
 
-def _prevent_forensic_tampering(mapper, connection, target):
+def _prevent_forensic_investigation_update(mapper, connection, target: ForensicInvestigation):
     """
-    Prevents modification or deletion of completed forensic investigations and claim drafts.
+    Prevents modification of immutable forensic investigation audit records.
+    Allows valid lifecycle state transitions (PENDING -> IN_PROGRESS -> COMPLETED/BLOCKED/FAILED),
+    but permanently locks the record once in a terminal state.
     """
-    if isinstance(target, ForensicInvestigation):
-        # Allow state transitions while in progress, but prevent modification once COMPLETED, FAILED, or BLOCKED
-        # Also prevent deletion completely
-        pass
+    insp = inspect(target)
+
+    # 1. Reject modification of fundamental audit references and evidence snapshots
+    immutable_fields = (
+        "tenant_id",
+        "exception_id",
+        "detection_run_id",
+        "evidence_bundle_fingerprint",
+        "evidence_bundle_snapshot",
+    )
+    for field_name in immutable_fields:
+        attr = insp.attrs.get(field_name)
+        if attr and attr.history.has_changes():
+            raise ImmutabilityViolationError(
+                f"Field '{field_name}' on ForensicInvestigation is immutable once created."
+            )
+
+    # 2. Reject modification once an investigation has reached a terminal status
+    db_status = connection.scalar(
+        select(mapper.c.status).where(mapper.c.id == target.id)
+    )
+    terminal_statuses = (
+        InvestigationStatus.COMPLETED.value,
+        InvestigationStatus.BLOCKED.value,
+        InvestigationStatus.FAILED.value,
+    )
+    if db_status in terminal_statuses:
+        raise ImmutabilityViolationError(
+            f"Modifications to {db_status} ForensicInvestigation '{target.id}' are strictly prohibited for audit integrity."
+        )
+
+
+def _prevent_forensic_claim_draft_update(mapper, connection, target: ForensicClaimDraft):
+    """
+    Protects deterministic financial quantum and evidence references from modification,
+    while permitting human review workflow updates (e.g. human_review_status, claim_summary).
+    Permanently locks claim drafts once ARCHIVED.
+    """
+    insp = inspect(target)
+
+    # 1. Protect core deterministic financial attributes and audit linkages from tampering
+    immutable_fields = (
+        "tenant_id",
+        "exception_id",
+        "investigation_id",
+        "detection_run_id",
+        "draft_number",
+        "dispute_amount",
+        "currency",
+        "target_reference",
+        "evidence_references",
+    )
+    for field_name in immutable_fields:
+        attr = insp.attrs.get(field_name)
+        if attr and attr.history.has_changes():
+            raise ImmutabilityViolationError(
+                f"Field '{field_name}' on ForensicClaimDraft is immutable once created to preserve financial audit trail."
+            )
+
+    # 2. Prevent modifications if claim draft is in terminal ARCHIVED state
+    db_status = connection.scalar(
+        select(mapper.c.status).where(mapper.c.id == target.id)
+    )
+    if db_status == ClaimDraftStatus.ARCHIVED.value:
+        raise ImmutabilityViolationError(
+            f"Modifications to ARCHIVED ForensicClaimDraft '{target.id}' are strictly prohibited."
+        )
 
 
 def _prevent_forensic_deletion(mapper, connection, target):
@@ -242,5 +380,7 @@ def _prevent_forensic_deletion(mapper, connection, target):
     )
 
 
+event.listen(ForensicInvestigation, "before_update", _prevent_forensic_investigation_update)
 event.listen(ForensicInvestigation, "before_delete", _prevent_forensic_deletion)
+event.listen(ForensicClaimDraft, "before_update", _prevent_forensic_claim_draft_update)
 event.listen(ForensicClaimDraft, "before_delete", _prevent_forensic_deletion)

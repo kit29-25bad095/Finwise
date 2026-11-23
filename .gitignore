@@ -23,8 +23,11 @@ wheels/
 *.manifest
 *.spec
 
+# Environment files
+.env*
+!.env*.example
+
 # Virtual Environments
-.env
 .venv
 env/
 venv/
@@ -40,10 +43,13 @@ htmlcov/
 .hypothesis/
 *.tsbuildinfo
 
-# Database
+# Database & Local Backups
 *.db
 *.sqlite
 *.sqlite3
+backend/backups/
+backend/storage/
+scratch/
 
 # Node & Next.js
 node_modules/

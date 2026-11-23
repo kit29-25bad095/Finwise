@@ -21,11 +21,16 @@ class RegisterRequest(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: Optional[str] = None
     token_type: str = "bearer"
     user: UserRead
     active_tenant_id: Optional[uuid.UUID] = None
     active_role: Optional[str] = None
     memberships: List[TenantMembershipRead] = []
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: Optional[str] = None
 
 
 class TokenPayload(BaseModel):

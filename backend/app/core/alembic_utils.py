@@ -48,10 +48,34 @@ def ensure_version_column_capacity(connection, length: int = 128) -> None:
     """
     If alembic_version table already exists with a narrower version_num column (e.g. VARCHAR(32)),
     widens it to VARCHAR(length) on PostgreSQL.
+
+    Transaction Handling:
+    - In standard Alembic execution, this helper is invoked inside Alembic's migration
+      transaction (`with context.begin_transaction():`), ensuring Alembic retains complete
+      ownership of the migration transaction and that PostgreSQL DDL and migration version
+      updates commit atomically.
+    - If invoked on an idle connection outside an active transaction, any transaction started
+      by SQLAlchemy's inspection query is rolled back in the finally block so that the helper
+      does not leave an unintended active transaction before Alembic begins.
     """
     if connection.dialect.name == "postgresql":
-        insp = inspect(connection)
-        if insp.has_table("alembic_version"):
-            connection.execute(
-                text(f"ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR({length});")
-            )
+        was_in_transaction = connection.in_transaction()
+        try:
+            insp = inspect(connection)
+            if insp.has_table("alembic_version"):
+                columns = insp.get_columns("alembic_version")
+                needs_alter = True
+                for col in columns:
+                    if col.get("name") == "version_num":
+                        col_type = col.get("type")
+                        current_length = getattr(col_type, "length", None)
+                        if current_length is not None and current_length >= length:
+                            needs_alter = False
+                            break
+                if needs_alter:
+                    connection.execute(
+                        text(f"ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR({length});")
+                    )
+        finally:
+            if not was_in_transaction and connection.in_transaction():
+                connection.rollback()

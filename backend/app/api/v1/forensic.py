@@ -1,6 +1,8 @@
 import uuid
+import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db_session as get_db
@@ -22,6 +24,7 @@ from app.schemas.forensic import (
 )
 from app.services.forensics.investigation_service import ForensicInvestigationService
 from app.services.forensics.claim_draft_service import ClaimDraftService
+from app.services.forensics.monitoring import ForensicMetricsCollector
 from app.services.forensics.exceptions import (
     ResourceNotFoundError,
     InvalidInvestigationStateError,
@@ -30,6 +33,8 @@ from app.services.forensics.exceptions import (
 )
 from app.workers.queue import enqueue_job
 from app.workers.forensic_tasks import process_forensic_investigation_job
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/forensics", tags=["AI Forensic Investigator & Root Cause Analysis"])
 
@@ -63,16 +68,46 @@ def create_investigation(
 
         # If investigation is freshly created in PENDING status, dispatch to worker
         if investigation.status == InvestigationStatus.PENDING.value:
-            enqueue_job(process_forensic_investigation_job, str(investigation.id))
+            try:
+                enqueue_job(process_forensic_investigation_job, str(investigation.id))
+            except Exception as q_err:
+                logger.exception("Failed to dispatch investigation %s to background queue", investigation.id)
+                investigation.status = InvestigationStatus.FAILED.value
+                investigation.error_message = "Background worker queue dispatch failure."
+                db.commit()
+                db.refresh(investigation)
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Background worker queue is currently unavailable."
+                )
+
+            # If queue dispatch succeeded, mark outbox event published if found
+            try:
+                from app.models.forensic import ForensicDispatchOutbox, OutboxEventType
+                from app.services.forensics.outbox_service import TransactionalOutboxService
+                idempotency_key = f"{investigation.id}:{OutboxEventType.INVESTIGATION_DISPATCH.value}:initial"
+                stmt_evt = select(ForensicDispatchOutbox).where(ForensicDispatchOutbox.idempotency_key == idempotency_key)
+                evt = db.execute(stmt_evt).scalar_one_or_none()
+                if evt:
+                    TransactionalOutboxService.mark_event_published(db, evt.id)
+            except Exception as outbox_err:
+                logger.warning("Could not mark outbox event published: %s", outbox_err)
+
             db.refresh(investigation)
 
         return investigation
     except ResourceNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except TenantMismatchError as e:
+    except TenantMismatchError:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to initiate investigation: {str(e)}")
+        logger.exception("Unexpected error initiating forensic investigation for exception %s", exception_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to initiate investigation due to an internal server error."
+        )
 
 
 @router.get(
@@ -174,8 +209,14 @@ def create_claim_draft(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except InvalidInvestigationStateError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to generate claim draft: {str(e)}")
+        logger.exception("Unexpected error generating claim draft for investigation %s", investigation_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate claim draft due to an internal server error."
+        )
 
 
 @router.get(
@@ -196,3 +237,17 @@ def get_claim_draft(
         )
     except ResourceNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Operational Metrics Endpoint
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/metrics",
+    summary="Get tenant-scoped operational metrics for AI forensic investigations (Admin / Finance Manager / Auditor)"
+)
+def get_forensic_metrics(
+    membership: TenantMembership = Depends(RoleChecker([Role.ADMIN, Role.FINANCE_MANAGER, Role.AUDITOR])),
+):
+    return ForensicMetricsCollector.get_tenant_metrics_summary(str(membership.tenant_id))

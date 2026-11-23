@@ -60,12 +60,16 @@ You must respond with a single valid JSON object strictly matching this schema:
     def build_user_prompt(cls, evidence_bundle: Dict[str, Any]) -> str:
         """
         Wraps the canonical evidence bundle in protective boundaries.
+        Escapes literal '<' and '>' as '\\u003c' and '\\u003e' in the serialized
+        JSON to prevent adversarial delimiter breakout while preserving exact
+        data recovery with json.loads().
         """
         bundle_json_str = json.dumps(evidence_bundle, indent=2, sort_keys=True)
+        safe_bundle_json = bundle_json_str.replace("<", "\\u003c").replace(">", "\\u003e")
         return f"""Investigate the following revenue leakage exception based STRICTLY on the enclosed evidence.
 
 <FINANCIAL_EVIDENCE_BUNDLE>
-{bundle_json_str}
+{safe_bundle_json}
 </FINANCIAL_EVIDENCE_BUNDLE>
 
 Analyze the evidence above and produce the structured forensic root-cause analysis JSON.

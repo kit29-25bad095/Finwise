@@ -108,6 +108,19 @@ class IngestionService:
         db.commit()
         db.refresh(batch)
 
+        # Persist document to private tenant-isolated storage
+        try:
+            from app.services.storage.file_storage import PrivateFileStorageService
+            PrivateFileStorageService.save_batch_file(
+                tenant_id=tenant_id,
+                batch_id=batch.id,
+                source_type=source_type,
+                file_bytes=file_bytes,
+                file_hash_sha256=file_hash,
+            )
+        except Exception as e:
+            logger.warning("Failed to persist file to private storage: %s", e)
+
         return (batch, False)
 
     @classmethod
@@ -288,6 +301,18 @@ class IngestionService:
             batch.status = IngestionStatus.COMPLETED_WITH_WARNINGS
         else:
             batch.status = IngestionStatus.COMPLETED
+
+        # SRE Monitoring Metrics
+        try:
+            from app.core.monitoring.metrics import metrics_collector
+            metrics_collector.record_ingestion_batch(
+                source_type=batch.source_type,
+                status=str(batch.status.value if hasattr(batch.status, "value") else batch.status),
+                row_count=total_rows,
+                error_count=invalid_rows,
+            )
+        except Exception:
+            pass
 
         # Audit Log
         audit = AuditLog(

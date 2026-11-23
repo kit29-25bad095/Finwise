@@ -1,0 +1,110 @@
+groups:
+  - name: finora_sre_alerts
+    rules:
+      # ========================================================================
+      # SEV-1 (CRITICAL) — Immediate On-Call Escalation (SLA <= 15m)
+      # ========================================================================
+
+      - alert: DatabaseConnectionFailure
+        expr: finora_database_healthy == 0
+        for: 1m
+        labels:
+          severity: SEV-1_CRITICAL
+          service: finora-backend
+          component: database
+        annotations:
+          summary: "PostgreSQL Database connection failed"
+          description: "Engine health probe cannot connect to PostgreSQL. Financial writes and reconciliation runs are failing."
+          response_procedure: "Check PostgreSQL instance health, verify connection pool status, inspect DB network routing."
+
+      - alert: RedisBrokerDown
+        expr: finora_redis_connected == 0
+        for: 1m
+        labels:
+          severity: SEV-1_CRITICAL
+          service: finora-backend
+          component: redis
+        annotations:
+          summary: "Redis Broker connection severed"
+          description: "Cannot connect to Redis broker. Background reconciliation and forensic tasks are blocked."
+          response_procedure: "Inspect Redis container status, check Redis memory saturation, verify network credentials."
+
+      - alert: HighHttp5xxErrorRate
+        expr: (sum(rate(finora_http_requests_total{status=~"5.."}[5m])) / sum(rate(finora_http_requests_total[5m]))) * 100 > 5
+        for: 3m
+        labels:
+          severity: SEV-1_CRITICAL
+          service: finora-backend
+          component: api
+        annotations:
+          summary: "HTTP 5xx server error rate exceeds 5%"
+          description: "API server error rate is {{ $value | printf \"%.2f\" }}% over the last 5 minutes."
+          response_procedure: "Inspect structured logs for unhandled exceptions, database deadlocks, or OOM crashes."
+
+      # ========================================================================
+      # SEV-2 (HIGH) — Urgent Team Escalation (SLA <= 30m)
+      # ========================================================================
+
+      - alert: HighTaskQueueBacklog
+        expr: finora_queue_depth{queue="finora_reconciliation_tasks"} > 100
+        for: 5m
+        labels:
+          severity: SEV-2_HIGH
+          service: finora-worker
+          component: queues
+        annotations:
+          summary: "Background task queue depth exceeds 100 jobs"
+          description: "Reconciliation and forensic workers are lagging behind ingestion. Current depth: {{ $value }}."
+          response_procedure: "Scale background worker containers: `docker compose up --scale worker=4 -d`."
+
+      - alert: ExcessiveBackgroundJobFailures
+        expr: finora_queue_jobs_failed_total > 10
+        for: 5m
+        labels:
+          severity: SEV-2_HIGH
+          service: finora-worker
+          component: workers
+        annotations:
+          summary: "Failed background jobs count reached {{ $value }}"
+          description: "Multiple asynchronous tasks terminated with unhandled runtime errors in FailedJobRegistry."
+          response_procedure: "Inspect RQ FailedJobRegistry, verify database constraints, and check worker exception traces."
+
+      - alert: HighApiLatencyP95
+        expr: finora_http_latency_seconds{quantile="0.95"} > 2.0
+        for: 5m
+        labels:
+          severity: SEV-2_HIGH
+          service: finora-backend
+          component: api
+        annotations:
+          summary: "API p95 latency exceeds 2.0 seconds"
+          description: "p95 API response time is {{ $value | printf \"%.2f\" }}s. Degradation in user experience."
+          response_procedure: "Check database connection pool contention, slow queries, and knapsack solver bounds."
+
+      - alert: PrivateStorageDiskCapacityHigh
+        expr: finora_storage_usage_ratio > 0.85
+        for: 10m
+        labels:
+          severity: SEV-2_HIGH
+          service: finora-backend
+          component: storage
+        annotations:
+          summary: "Private file storage utilization exceeds 85%"
+          description: "Financial statement storage volume has reached {{ $value | printf \"%.1f\" }}% capacity."
+          response_procedure: "Expand storage volume partition or trigger statutory retention purge."
+
+      # ========================================================================
+      # SEV-3 (MEDIUM) — Next Business Day / Queue Review (SLA <= 4h)
+      # ========================================================================
+
+      - alert: GeminiRateLimitHit
+        expr: rate(finora_gemini_requests_total{status="failed"}[10m]) > 0.1
+        for: 5m
+        labels:
+          severity: SEV-3_MEDIUM
+          service: finora-forensics
+          component: gemini_ai
+        annotations:
+          summary: "Google Gemini API rate limits or quota throttling observed"
+          description: "Forensic AI investigation requests are encountering 429 rate limit or quota errors."
+          response_procedure: "Verify exponential backoff settings in workers or request GCP Gemini quota expansion."

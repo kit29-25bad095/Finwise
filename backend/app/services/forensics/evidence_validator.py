@@ -13,8 +13,25 @@ class EvidenceValidator:
 
     # PII Regex Patterns
     EMAIL_PATTERN = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+")
-    PHONE_PATTERN = re.compile(r"(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}")
-    ACCOUNT_PATTERN = re.compile(r"\b\d{9,18}\b")
+    
+    # Formatted phone numbers with standard delimiters or international country code (+91, hyphens, spaces, parens)
+    FORMATTED_PHONE_PATTERN = re.compile(
+        r"(?:\+?\d{1,3}[-.\s])?\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}\b|\+91[-.\s]?[6-9]\d{9}\b"
+    )
+
+    # Free-form bank account numbers with explicit contextual keywords (A/C, Account, Acct, etc.)
+    EXPLICIT_ACCOUNT_PATTERN = re.compile(
+        r"(?i)\b(?:a/?c|acc(?:ount)?|a/c\s*(?:no\.?|num(?:ber)?)|acct)\s*[:#-]?\s*(\d{5,14})(\d{4})\b"
+    )
+
+    # Free-form standalone bank account numbers (11 to 18 contiguous digits)
+    # Strictly excludes decimal numbers (financial amounts like 12500000.50) and alphanumeric IDs (UTRs, payment IDs)
+    STANDALONE_ACCOUNT_PATTERN = re.compile(
+        r"(?<![A-Za-z0-9_])(?<!\d\.)\b(\d{7,14})(\d{4})\b(?!\.\d)(?![A-Za-z0-9_])"
+    )
+
+    # Standalone 10-digit mobile phone numbers (Indian telecom numbering 6-9xxxxxxxx)
+    STANDALONE_PHONE_PATTERN = re.compile(r"\b[6-9]\d{9}\b")
 
     @classmethod
     def verify_evidence_fingerprint(
@@ -94,10 +111,16 @@ class EvidenceValidator:
             return [cls.redact_pii(item) for item in val]
 
         if isinstance(val, str):
-            # Mask emails
+            # 1. Mask emails
             cleaned = cls.EMAIL_PATTERN.sub("[REDACTED_EMAIL]", val)
-            # Mask phones
-            cleaned = cls.PHONE_PATTERN.sub("[REDACTED_PHONE]", cleaned)
+            # 2. Mask formatted phone numbers
+            cleaned = cls.FORMATTED_PHONE_PATTERN.sub("[REDACTED_PHONE]", cleaned)
+            # 3. Mask contextual bank accounts (e.g. "A/C 123456789012" -> "A/C *******9012")
+            cleaned = cls.EXPLICIT_ACCOUNT_PATTERN.sub(lambda m: f"A/C *******{m.group(2)}", cleaned)
+            # 4. Mask standalone 11-18 digit bank account numbers -> "*******{last4}"
+            cleaned = cls.STANDALONE_ACCOUNT_PATTERN.sub(lambda m: f"*******{m.group(2)}", cleaned)
+            # 5. Mask standalone 10-digit mobile phone numbers
+            cleaned = cls.STANDALONE_PHONE_PATTERN.sub("[REDACTED_PHONE]", cleaned)
             return cleaned
 
         return val

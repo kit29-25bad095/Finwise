@@ -78,19 +78,33 @@ def upgrade() -> None:
         # PostgreSQL / generic SQL engines
         for tbl in TABLES_TO_PROTECT:
             # Query actual constraint name dynamically to ensure portability
-            try:
-                row = bind.execute(sa.text(
-                    "SELECT tc.constraint_name "
-                    "FROM information_schema.table_constraints tc "
-                    "JOIN information_schema.key_column_usage kcu "
-                    "  ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema "
-                    "WHERE tc.table_name = :tbl "
-                    "  AND tc.constraint_type = 'FOREIGN KEY' "
-                    "  AND kcu.column_name = 'tenant_id'"
-                ), {"tbl": tbl}).fetchone()
-                constraint_name = row[0] if row else f"{tbl}_tenant_id_fkey"
-            except Exception:
-                constraint_name = f"{tbl}_tenant_id_fkey"
+            row = bind.execute(sa.text(
+                "SELECT tc.constraint_name "
+                "FROM information_schema.table_constraints tc "
+                "JOIN information_schema.key_column_usage kcu "
+                "  ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema "
+                "WHERE tc.table_name = :tbl "
+                "  AND tc.constraint_type = 'FOREIGN KEY' "
+                "  AND kcu.column_name = 'tenant_id'"
+            ), {"tbl": tbl}).fetchone()
+
+            if row and row[0]:
+                constraint_name = row[0]
+            else:
+                # Fallback to pg_constraint lookup or raise explicit diagnostic failure
+                check_row = bind.execute(sa.text(
+                    "SELECT conname FROM pg_constraint con "
+                    "JOIN pg_class rel ON rel.oid = con.conrelid "
+                    "WHERE rel.relname = :tbl AND con.contype = 'f'"
+                ), {"tbl": tbl}).fetchall()
+                matching = [c[0] for c in check_row if "tenant_id" in c[0]]
+                if matching:
+                    constraint_name = matching[0]
+                else:
+                    raise RuntimeError(
+                        f"Explicit failure in migration 006: Unable to locate foreign key constraint "
+                        f"on table '{tbl}' referencing 'tenants.id'. Found foreign keys: {[c[0] for c in check_row]}."
+                    )
 
             op.drop_constraint(constraint_name, tbl, type_='foreignkey')
             op.create_foreign_key(

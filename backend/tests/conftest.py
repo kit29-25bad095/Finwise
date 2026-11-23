@@ -12,6 +12,7 @@ os.environ["DATABASE_URL"] = "sqlite://"
 os.environ["SYNC_DATABASE_URL"] = "sqlite://"
 os.environ["REDIS_URL"] = "redis://localhost:6379/1"
 os.environ["WORKER_FALLBACK_SYNC"] = "true"
+os.environ["AI_PROVIDER"] = "mock"
 
 from app.core.config import settings
 from app.core.database import Base, get_db_session

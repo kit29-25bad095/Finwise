@@ -26,3 +26,13 @@ class InvalidInvestigationStateError(ForensicError):
 class ResourceNotFoundError(ForensicError):
     """Raised when a requested exception, run, or evidence record cannot be found."""
     pass
+
+
+class StaleLeaseError(ForensicError):
+    """Raised when an investigation write is rejected due to a superseded or expired lease token."""
+    pass
+
+
+class LeaseRenewalError(ForensicError):
+    """Raised when attempting to renew an already-expired or revoked investigation lease."""
+    pass

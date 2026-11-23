@@ -3,7 +3,7 @@ import asyncio
 import logging
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
-from sqlalchemy import select, and_, desc
+from sqlalchemy import select, and_, desc, update
 
 from app.models.forensic import (
     ForensicInvestigation,
@@ -17,12 +17,16 @@ from app.services.forensics.exceptions import (
     EvidenceIntegrityError,
     LLMProviderError,
     InvalidInvestigationStateError,
+    StaleLeaseError,
 )
 from app.services.forensics.forensic_reader import LeakageForensicReader
 from app.services.forensics.evidence_bundle_builder import EvidenceBundleBuilder
 from app.services.forensics.prompt_builder import ForensicPromptBuilder
 from app.services.forensics.confidence_evaluator import ConfidenceEvaluator
 from app.services.forensics.llm_adapter import BaseLLMAdapter, get_llm_adapter
+from app.services.forensics.monitoring import ForensicMetricsCollector
+from app.services.forensics.lease_manager import InvestigationLeaseManager
+from app.services.forensics.outbox_service import TransactionalOutboxService
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +132,15 @@ class ForensicInvestigationService:
         )
 
         db.add(investigation)
+        db.flush()
+
+        # 8. Atomically co-commit initial dispatch intent in Transactional Outbox
+        TransactionalOutboxService.create_initial_dispatch_intent(
+            db=db,
+            tenant_id=tenant_id,
+            investigation_id=investigation.id,
+        )
+
         db.commit()
         db.refresh(investigation)
         return investigation
@@ -147,12 +160,53 @@ class ForensicInvestigationService:
         if not inv:
             raise ResourceNotFoundError(f"Forensic investigation {investigation_id} not found.")
 
+        # Guard 1: Terminal status check
+        terminal_statuses = (
+            InvestigationStatus.COMPLETED.value,
+            InvestigationStatus.BLOCKED.value,
+            InvestigationStatus.FAILED.value,
+        )
+        if inv.status in terminal_statuses:
+            logger.info(
+                "Investigation %s is already in terminal state '%s'. Skipping re-execution.",
+                investigation_id,
+                inv.status,
+            )
+            return inv
+
+        # Guard 2: Lease-authoritative atomic claim or reclaim
+        worker_id = f"worker-{uuid.uuid4().hex[:8]}"
+        lease_token: Optional[uuid.UUID] = None
+
+        if inv.status == InvestigationStatus.PENDING.value:
+            lease_token = InvestigationLeaseManager.claim_pending_investigation(
+                db=db,
+                investigation_id=investigation_id,
+                worker_id=worker_id,
+            )
+        elif inv.status == InvestigationStatus.IN_PROGRESS.value:
+            lease_token = InvestigationLeaseManager.reclaim_expired_investigation(
+                db=db,
+                investigation_id=investigation_id,
+                worker_id=worker_id,
+            )
+
+        if lease_token is None:
+            db.refresh(inv)
+            logger.info(
+                "Investigation %s could not be claimed by worker %s (status=%s, attempt_count=%d). Skipping.",
+                investigation_id,
+                worker_id,
+                inv.status,
+                inv.attempt_count,
+            )
+            return inv
+
+        db.refresh(inv)
+
         bundle = inv.evidence_bundle_snapshot or {}
         all_verified = bundle.get("all_evidence_verified", False)
         evidence_items = bundle.get("evidence_items", [])
-
-        inv.status = InvestigationStatus.IN_PROGRESS.value
-        db.commit()
 
         # Step 1: Pre-flight Evidence Integrity Guard
         if not all_verified:
@@ -164,6 +218,11 @@ class ForensicInvestigationService:
                 "integrity verification or tenancy bounds."
             )
             inv.error_message = "Cryptographic evidence integrity check failed."
+            inv.lease_owner_id = None
+            inv.lease_token = None
+            inv.lease_expires_at = None
+            ForensicMetricsCollector.record_investigation_blocked(str(inv.tenant_id), "evidence_integrity_failure")
+            ForensicMetricsCollector.record_evidence_integrity_failure(str(inv.tenant_id), str(investigation_id))
             db.commit()
             db.refresh(inv)
             return inv
@@ -173,6 +232,12 @@ class ForensicInvestigationService:
             inv.conclusion = InvestigationConclusion.INCONCLUSIVE.value
             inv.confidence = InvestigationConfidence.LOW.value
             inv.summary = "No evidence records were found to evaluate for this exception and run."
+            inv.lease_owner_id = None
+            inv.lease_token = None
+            inv.lease_expires_at = None
+            ForensicMetricsCollector.record_investigation_completed(
+                str(inv.tenant_id), "none", 0.0, 0, 0.0, inv.conclusion, inv.confidence
+            )
             db.commit()
             db.refresh(inv)
             return inv
@@ -181,8 +246,12 @@ class ForensicInvestigationService:
         system_prompt = ForensicPromptBuilder.get_system_prompt()
         user_prompt = ForensicPromptBuilder.build_user_prompt(bundle)
 
-        # Step 3: Dispatch to LLM
+        # Release database transaction before external network wait
+        db.commit()
+
+        # Step 3: Dispatch to LLM (Executed outside DB transaction)
         active_adapter = adapter or get_llm_adapter()
+        ForensicMetricsCollector.record_investigation_started(str(inv.tenant_id), active_adapter.model_name)
         try:
             raw_result = await active_adapter.generate_investigation(
                 system_prompt=system_prompt,
@@ -195,30 +264,67 @@ class ForensicInvestigationService:
                 evidence_bundle=bundle
             )
 
-            inv.status = InvestigationStatus.COMPLETED.value
-            inv.conclusion = conclusion.value
-            inv.confidence = confidence.value
-            inv.summary = result_contract.summary
-            inv.investigation_result = result_contract.model_dump()
-            inv.model_provider = active_adapter.provider_name
-            inv.model_name = active_adapter.model_name
-            inv.error_message = None
+            # Step 5: Fencing-Protected Atomic Persistence (Transaction 2)
+            inv = InvestigationLeaseManager.validate_and_persist_completed_investigation(
+                db=db,
+                investigation_id=investigation_id,
+                worker_lease_token=lease_token,
+                conclusion=conclusion,
+                confidence=confidence,
+                summary=result_contract.summary,
+                investigation_result=result_contract.model_dump(),
+                model_provider=active_adapter.provider_name,
+                model_name=active_adapter.model_name,
+            )
 
+            # Record operational metrics
+            meta = result_contract.execution_metadata or {}
+            latency_ms = meta.get("latency_ms", 0.0)
+            tokens = meta.get("total_tokens", 0)
+            cost = meta.get("estimated_cost_usd", 0.0)
+            ForensicMetricsCollector.record_investigation_completed(
+                tenant_id=str(inv.tenant_id),
+                model=active_adapter.model_name,
+                latency_ms=latency_ms,
+                tokens=tokens,
+                cost_usd=cost,
+                conclusion=conclusion.value,
+                confidence=confidence.value
+            )
+
+        except StaleLeaseError:
+            logger.warning(
+                "Stale lease write rejected for investigation %s (token %s). Discarding in-memory findings.",
+                investigation_id,
+                lease_token,
+            )
+            raise
         except LLMProviderError as e:
             logger.error(f"LLM Provider failure for investigation {investigation_id}: {str(e)}")
             inv.status = InvestigationStatus.FAILED.value
             inv.conclusion = InvestigationConclusion.INCONCLUSIVE.value
             inv.confidence = InvestigationConfidence.LOW.value
             inv.error_message = f"AI Provider failure: {str(e)}"
+            inv.lease_owner_id = None
+            inv.lease_token = None
+            inv.lease_expires_at = None
+            ForensicMetricsCollector.record_investigation_failed(str(inv.tenant_id), "LLMProviderError")
+            db.commit()
+            db.refresh(inv)
         except Exception as e:
             logger.exception(f"Unexpected error executing investigation {investigation_id}: {str(e)}")
             inv.status = InvestigationStatus.FAILED.value
             inv.conclusion = InvestigationConclusion.INCONCLUSIVE.value
             inv.confidence = InvestigationConfidence.LOW.value
             inv.error_message = f"Runtime execution error: {str(e)}"
+            inv.lease_owner_id = None
+            inv.lease_token = None
+            inv.lease_expires_at = None
+            ForensicMetricsCollector.record_investigation_failed(str(inv.tenant_id), type(e).__name__)
+            db.commit()
+            db.refresh(inv)
 
-        db.commit()
-        db.refresh(inv)
+        return inv
         return inv
 
     @classmethod

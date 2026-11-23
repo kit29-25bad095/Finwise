@@ -130,17 +130,19 @@ def test_claim_draft_version_preservation(db_session: Session):
 
 
 def test_claim_draft_fails_on_incomplete_investigation(db_session: Session):
-    tenant, run, exc, inv = _seed_completed_investigation(db_session)
+    tenant, run, exc, _ = _seed_completed_investigation(db_session)
 
-    # Revert investigation status to PENDING
-    inv.status = InvestigationStatus.PENDING.value
-    db_session.commit()
+    # Create fresh investigation in PENDING status (not completed)
+    pending_inv = ForensicInvestigationService.create_investigation(
+        db_session, tenant.id, exc.id, force_refresh=True
+    )
+    assert pending_inv.status == InvestigationStatus.PENDING.value
 
     with pytest.raises(InvalidInvestigationStateError, match="must be COMPLETED"):
         ClaimDraftService.create_claim_draft(
             db=db_session,
             tenant_id=tenant.id,
-            investigation_id=inv.id
+            investigation_id=pending_inv.id
         )
 
 

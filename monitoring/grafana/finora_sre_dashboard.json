@@ -1,0 +1,201 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "title": "SRE Golden Signals — API Latency, Throughput & Errors",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 95 },
+              { "color": "green", "value": 99.5 }
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 1 },
+      "id": 2,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        { "expr": "finora_http_availability_ratio * 100", "legendFormat": "Availability %" }
+      ],
+      "title": "API Availability Ratio",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "s" }
+      },
+      "gridPos": { "h": 5, "w": 10, "x": 4, "y": 1 },
+      "id": 3,
+      "targets": [
+        { "expr": "finora_http_latency_seconds{quantile=\"0.5\"}", "legendFormat": "p50 Latency" },
+        { "expr": "finora_http_latency_seconds{quantile=\"0.95\"}", "legendFormat": "p95 Latency" },
+        { "expr": "finora_http_latency_seconds{quantile=\"0.99\"}", "legendFormat": "p99 Latency" }
+      ],
+      "title": "API Latency Quantiles (p50, p95, p99)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps" }
+      },
+      "gridPos": { "h": 5, "w": 10, "x": 14, "y": 1 },
+      "id": 4,
+      "targets": [
+        { "expr": "sum(rate(finora_http_requests_total[1m]))", "legendFormat": "Total Req/s" },
+        { "expr": "sum(rate(finora_http_requests_total{status=~\"5..\"}[1m]))", "legendFormat": "5xx Errors/s" }
+      ],
+      "title": "HTTP Throughput & Error Rate",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "id": 5,
+      "title": "Backing Infrastructure Health — PostgreSQL 17 & Redis 7",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "options": { "0": { "color": "red", "text": "DOWN" }, "1": { "color": "green", "text": "HEALTHY" } }, "type": "value" }
+          ]
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 7 },
+      "id": 6,
+      "targets": [{ "expr": "finora_database_healthy", "legendFormat": "PostgreSQL 17 Status" }],
+      "title": "PostgreSQL Health",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "options": { "0": { "color": "red", "text": "DISCONNECTED" }, "1": { "color": "green", "text": "CONNECTED" } }, "type": "value" }
+          ]
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 7 },
+      "id": 7,
+      "targets": [{ "expr": "finora_redis_connected", "legendFormat": "Redis 7 Status" }],
+      "title": "Redis Health",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "ms" }
+      },
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 7 },
+      "id": 8,
+      "targets": [
+        { "expr": "finora_database_ping_latency_ms", "legendFormat": "PostgreSQL Ping Latency (ms)" },
+        { "expr": "finora_redis_ping_latency_ms", "legendFormat": "Redis Ping Latency (ms)" }
+      ],
+      "title": "Backing Store Round-Trip Latency",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 11 },
+      "id": 9,
+      "title": "Background Worker Queues & AI Observability",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "none" }
+      },
+      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 12 },
+      "id": 10,
+      "targets": [
+        { "expr": "finora_queue_depth", "legendFormat": "Pending Queue Depth" },
+        { "expr": "finora_queue_jobs_failed_total", "legendFormat": "Failed Jobs" }
+      ],
+      "title": "RQ Worker Queue Saturation",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "s" }
+      },
+      "gridPos": { "h": 5, "w": 8, "x": 8, "y": 12 },
+      "id": 11,
+      "targets": [
+        { "expr": "finora_gemini_latency_seconds{quantile=\"0.95\"}", "legendFormat": "Gemini p95 Latency" }
+      ],
+      "title": "Google Gemini AI Inference Latency (p95)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 75 },
+              { "color": "red", "value": 85 }
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 12 },
+      "id": 12,
+      "targets": [
+        { "expr": "finora_storage_usage_ratio * 100", "legendFormat": "Private Storage Usage %" }
+      ],
+      "title": "Private Document Storage Volume Capacity",
+      "type": "gauge"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["finora", "sre", "production", "observability"],
+  "time": { "from": "now-1h", "to": "now" },
+  "timezone": "utc",
+  "title": "Finora SRE & Financial Engine Production Dashboard",
+  "uid": "finora-sre-prod"
+}

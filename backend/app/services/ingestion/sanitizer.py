@@ -6,20 +6,19 @@ from typing import Optional, Union, Tuple
 # Indian Standard Time (UTC+05:30)
 IST = timezone(timedelta(hours=5, minutes=30))
 
-FORMULA_PREFIXES = ("=", "+", "-", "@", "|", "%")
+FORMULA_PREFIXES = ("=", "+", "-", "@", "|", "%", "\t", "\r")
 
 
 def sanitize_csv_cell(value: Optional[str]) -> str:
     """
     DDE / CSV Formula Injection Sanitizer.
     Protects finance teams opening exported CSV files in Excel or Google Sheets.
-    If a string starts with formula triggers (=, +, -, @, |, %), escape with leading single quote.
+    If a string starts with formula triggers (=, +, -, @, |, %, tab, carriage return), escape with leading single quote.
     """
     if value is None:
         return ""
-    val_str = str(value).strip()
-    if val_str.startswith(FORMULA_PREFIXES):
-        # Escape with a leading apostrophe
+    val_str = str(value)
+    if val_str.startswith(FORMULA_PREFIXES) or val_str.strip().startswith(FORMULA_PREFIXES):
         return "'" + val_str
     return val_str
 

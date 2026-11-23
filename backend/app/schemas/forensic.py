@@ -31,12 +31,15 @@ class Hypothesis(BaseModel):
 
 
 class InvestigationResultContract(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     summary: str = Field(..., description="Executive summary of the forensic investigation")
     hypotheses: List[Hypothesis] = Field(default_factory=list, description="Root cause hypotheses evaluated against evidence")
     verified_facts: List[str] = Field(default_factory=list, description="Empirical facts substantiated by verified evidence records")
     contradictions: List[str] = Field(default_factory=list, description="Direct contradictions detected between evidence records")
     missing_information: List[str] = Field(default_factory=list, description="Gaps in evidence preventing full confirmation")
     recommended_human_checks: List[str] = Field(default_factory=list, description="Actionable inspection steps recommended for human operators")
+    execution_metadata: Optional[Dict[str, Any]] = Field(default=None, description="Model provider execution metrics, latency, and token consumption")
 
 
 class EvidenceItemSummary(BaseModel):
