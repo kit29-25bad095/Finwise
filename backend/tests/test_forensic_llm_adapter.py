@@ -48,7 +48,7 @@ async def test_gemini_llm_adapter_missing_api_key(monkeypatch):
     monkeypatch.setattr(settings, "AI_API_KEY", None)
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     adapter = GeminiLLMAdapter(api_key=None)
-    with pytest.raises(LLMProviderError, match="UNVERIFIED"):
+    with pytest.raises(LLMProviderError, match="PENDING_CONFIGURATION|UNVERIFIED"):
         await adapter.generate_investigation(system_prompt="sys", user_prompt="usr")
 
 

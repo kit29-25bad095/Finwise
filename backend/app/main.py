@@ -1,6 +1,7 @@
 import logging
+import uuid
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, status, Depends
+from fastapi import FastAPI, status, Depends, Request, Response, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -12,7 +13,8 @@ from app.core.middleware import SecurityHeadersMiddleware
 from app.core.rate_limit import RateLimitMiddleware
 from app.core.monitoring.logging import configure_structured_logging
 from app.core.monitoring.middleware import ObservabilityMiddleware
-from app.api.v1 import auth, tenants, ingestion, reconciliation, leakage, forensic, monitoring
+from app.api.v1 import auth, tenants, ingestion, reconciliation, leakage, forensic, monitoring, dashboard
+from app.workers.queue import check_worker_queue_health
 
 logger = logging.getLogger("finora.main")
 
@@ -79,7 +81,6 @@ app.add_middleware(
     ],
 )
 
-
 # Register API Routers
 app.include_router(auth.router, prefix=settings.API_V1_STR)
 app.include_router(tenants.router, prefix=settings.API_V1_STR)
@@ -87,7 +88,26 @@ app.include_router(ingestion.router, prefix=settings.API_V1_STR)
 app.include_router(reconciliation.router, prefix=settings.API_V1_STR)
 app.include_router(leakage.router, prefix=settings.API_V1_STR)
 app.include_router(forensic.router, prefix=settings.API_V1_STR)
+app.include_router(dashboard.router, prefix=settings.API_V1_STR)
 app.include_router(monitoring.router)
+
+
+@app.get("/health", status_code=status.HTTP_200_OK, tags=["System"])
+@app.get(f"{settings.API_V1_STR}/health", status_code=status.HTTP_200_OK, tags=["System"])
+def healthcheck(db: Session = Depends(get_db_session)):
+    db_status = "HEALTHY"
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception as e:
+        db_status = f"UNHEALTHY: {str(e)}"
+
+    return {
+        "status": "ONLINE",
+        "service": "Finora Financial Engine",
+        "version": "1.0.0",
+        "environment": settings.ENVIRONMENT,
+        "database": db_status
+    }
 
 
 @app.get("/health/live", status_code=status.HTTP_200_OK, tags=["System"])
@@ -106,7 +126,7 @@ def liveness():
 @app.get(f"{settings.API_V1_STR}/health/ready", tags=["System"])
 def readiness(db: Session = Depends(get_db_session)):
     """
-    Readiness probe: verifies essential backing services (PostgreSQL and Redis).
+    Readiness probe: verifies essential backing services (PostgreSQL, Redis, and AI Provider).
     Returns HTTP 200 if all backing dependencies are healthy.
     Returns HTTP 503 if any required service is unreachable or degraded.
     """
@@ -142,30 +162,25 @@ def readiness(db: Session = Depends(get_db_session)):
         else:
             dependencies["redis"] = f"DEGRADED_FALLBACK: {str(e)}"
 
+    queue_health = check_worker_queue_health()
+    dependencies["worker_queue"] = queue_health
+
+    ai_configured = bool(settings.resolved_ai_api_key)
+    dependencies["ai_provider"] = {
+        "provider": settings.AI_PROVIDER,
+        "model": settings.AI_MODEL,
+        "status": "CONFIGURED" if ai_configured else "PENDING_CONFIGURATION",
+    }
+
     resp_payload = {
         "status": "READY" if is_healthy else "NOT_READY",
         "service": "Finora Financial Engine",
         "version": "1.0.0",
         "environment": settings.ENVIRONMENT,
         "dependencies": dependencies,
+        "database": "CONNECTED" if is_healthy and "UNHEALTHY" not in dependencies.get("database", "") else "DISCONNECTED",
+        "worker_queue": queue_health,
+        "ai_provider": dependencies["ai_provider"]
     }
     status_code = status.HTTP_200_OK if is_healthy else status.HTTP_503_SERVICE_UNAVAILABLE
     return JSONResponse(status_code=status_code, content=resp_payload)
-
-
-@app.get("/health", status_code=status.HTTP_200_OK, tags=["System"])
-@app.get(f"{settings.API_V1_STR}/health", status_code=status.HTTP_200_OK, tags=["System"])
-def healthcheck(db: Session = Depends(get_db_session)):
-    db_status = "HEALTHY"
-    try:
-        db.execute(text("SELECT 1"))
-    except Exception as e:
-        db_status = f"UNHEALTHY: {str(e)}"
-
-    return {
-        "status": "ONLINE",
-        "service": "Finora Financial Engine",
-        "version": "1.0.0",
-        "environment": settings.ENVIRONMENT,
-        "database": db_status
-    }

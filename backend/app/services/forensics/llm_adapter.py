@@ -57,7 +57,8 @@ class BaseLLMAdapter(ABC):
 class GeminiLLMAdapter(BaseLLMAdapter):
     """
     Official Google GenAI (Gemini) LLM Adapter using the google-genai SDK.
-    Supports asynchronous execution, timeout handling, retries, and strict JSON output parsing.
+    Supports asynchronous execution, timeout handling, retries, rate-limit backoff,
+    and strict JSON output parsing.
     """
 
     def __init__(
@@ -76,7 +77,13 @@ class GeminiLLMAdapter(BaseLLMAdapter):
             logger.info("Mapping deprecated model %s to gemini-3.1-flash-lite", model)
             model = "gemini-3.1-flash-lite"
         super().__init__(model_name=model, temperature=temperature, max_tokens=max_tokens)
-        self.api_key = api_key or settings.AI_API_KEY or os.environ.get("GEMINI_API_KEY")
+        resolved_key = (
+            api_key
+            or settings.resolved_ai_api_key
+            or os.environ.get("GEMINI_API_KEY")
+            or os.environ.get("AI_API_KEY")
+        )
+        self.api_key = resolved_key.strip() if resolved_key and resolved_key.strip() else None
         self.timeout_seconds = timeout_seconds
         self.max_retries = max_retries
         self.fallback_adapter = fallback_adapter
@@ -85,23 +92,28 @@ class GeminiLLMAdapter(BaseLLMAdapter):
     def provider_name(self) -> str:
         return "gemini"
 
+    @property
+    def is_configured(self) -> bool:
+        return bool(self.api_key and len(self.api_key) > 5)
+
     async def generate_investigation(
         self,
         system_prompt: str,
         user_prompt: str,
     ) -> Dict[str, Any]:
-        if not self.api_key:
+        if not self.is_configured:
             if self.fallback_adapter:
                 logger.warning("Gemini API key is not configured; invoking fallback adapter %s", self.fallback_adapter.provider_name)
                 return await self.fallback_adapter.generate_investigation(system_prompt, user_prompt)
             raise LLMProviderError(
-                "Gemini API key is not configured. Set AI_API_KEY or GEMINI_API_KEY environment variable. "
-                "Live provider status: UNVERIFIED."
+                "Gemini API key is not configured. Set GEMINI_API_KEY or AI_API_KEY environment variable. "
+                "Provider status: PENDING_CONFIGURATION (UNVERIFIED)."
             )
 
         try:
             from google import genai
             from google.genai import types
+            from google.genai.errors import APIError, ClientError
         except ImportError as e:
             if self.fallback_adapter:
                 logger.warning("google-genai package not installed; invoking fallback adapter %s", self.fallback_adapter.provider_name)
@@ -114,7 +126,7 @@ class GeminiLLMAdapter(BaseLLMAdapter):
         last_error = None
         for attempt in range(1, self.max_retries + 1):
             try:
-                # Wrap with timeout
+                # Wrap with explicit asyncio timeout
                 async with asyncio.timeout(self.timeout_seconds):
                     config = types.GenerateContentConfig(
                         system_instruction=system_prompt,
@@ -131,27 +143,41 @@ class GeminiLLMAdapter(BaseLLMAdapter):
                 duration_sec = time.perf_counter() - start_time
                 latency_ms = duration_sec * 1000.0
                 metrics_collector.record_gemini_call(duration_sec=duration_sec, success=True)
-                text = response.text or ""
+                text = getattr(response, "text", "") or ""
                 parsed = self._parse_json_response(text)
 
                 # Extract token usage and compute estimated cost
                 usage = getattr(response, "usage_metadata", None)
-                prompt_tokens = getattr(usage, "prompt_token_count", 0) if usage else 0
-                candidates_tokens = getattr(usage, "candidates_token_count", 0) if usage else 0
-                total_tokens = getattr(usage, "total_token_count", 0) if usage else (prompt_tokens + candidates_tokens)
+                prompt_tokens = getattr(usage, "prompt_token_count", None) if usage else None
+                candidates_tokens = getattr(usage, "candidates_token_count", None) if usage else None
+                total_tokens = getattr(usage, "total_token_count", None) if usage else None
 
-                # Gemini 3.1 Flash-Lite pricing estimate (~$0.075/1M prompt, $0.30/1M completion)
-                est_cost = (prompt_tokens * 0.000000075) + (candidates_tokens * 0.00000030)
+                p_tok = prompt_tokens or 0
+                c_tok = candidates_tokens or 0
+                tot_tok = total_tokens or (p_tok + c_tok)
 
+                # Gemini Flash-Lite pricing estimate (~$0.075/1M prompt, $0.30/1M completion)
+                est_cost = (p_tok * 0.000000075) + (c_tok * 0.00000030)
+
+                parsed["_token_usage"] = {
+                    "prompt_tokens": prompt_tokens,
+                    "candidate_tokens": candidates_tokens,
+                    "total_tokens": total_tokens,
+                    "model": self.model_name
+                }
                 parsed["_execution_metadata"] = {
                     "provider": self.provider_name,
                     "model": self.model_name,
                     "latency_ms": round(latency_ms, 2),
-                    "prompt_tokens": prompt_tokens,
-                    "candidates_tokens": candidates_tokens,
-                    "total_tokens": total_tokens,
+                    "prompt_tokens": p_tok,
+                    "candidates_tokens": c_tok,
+                    "total_tokens": tot_tok,
                     "estimated_cost_usd": round(est_cost, 6),
                 }
+                logger.info(
+                    f"Gemini investigation completed. Model: {self.model_name}, "
+                    f"Prompt tokens: {prompt_tokens}, Candidate tokens: {candidates_tokens}, Total tokens: {total_tokens}"
+                )
                 return parsed
 
             except asyncio.TimeoutError:
@@ -161,6 +187,25 @@ class GeminiLLMAdapter(BaseLLMAdapter):
                     error_type="timeout",
                 )
                 last_error = f"Gemini request timed out after {self.timeout_seconds}s (attempt {attempt}/{self.max_retries})"
+                logger.warning(last_error)
+            except ClientError as e:
+                # 400, 401, 403 are non-retryable client errors (invalid key, model not found, etc.)
+                err_msg = str(e)
+                code = getattr(e, "code", None)
+                if code in (401, 403) or any(term in err_msg.lower() for term in ("api_key_invalid", "invalid api key", "unauthenticated", "permission_denied")):
+                    raise LLMProviderError(f"Gemini API authentication failed: Invalid or expired API key. Details: {err_msg}")
+                raise LLMProviderError(f"Gemini API client error (HTTP {code}): {err_msg}")
+            except APIError as e:
+                err_str = str(e)
+                code = getattr(e, "code", None)
+                # Rate limit (429) or quota exhaustion
+                if code == 429 or "429" in err_str or any(term in err_str.lower() for term in ("quota", "resource_exhausted", "rate limit")):
+                    last_error = f"Gemini API rate limit exceeded (HTTP 429 / RESOURCE_EXHAUSTED): {err_str}"
+                    logger.warning(f"{last_error}. Backing off attempt {attempt}/{self.max_retries}...")
+                    if attempt < self.max_retries:
+                        await asyncio.sleep(2 ** attempt)
+                        continue
+                last_error = f"Gemini API server error (HTTP {code}): {err_str}"
                 logger.warning(last_error)
             except Exception as e:
                 raw_err = str(e)
@@ -176,10 +221,11 @@ class GeminiLLMAdapter(BaseLLMAdapter):
                 logger.warning(last_error)
                 # Rate limit or quota error check -> exponential backoff
                 if "429" in raw_err or "quota" in err_lower or "resource_exhausted" in err_lower:
-                    backoff = 2 ** attempt
-                    logger.info("Rate limit hit on Gemini API; sleeping for %ss before retry", backoff)
-                    await asyncio.sleep(backoff)
-                    continue
+                    if attempt < self.max_retries:
+                        backoff = 2 ** attempt
+                        logger.info("Rate limit hit on Gemini API; sleeping for %ss before retry", backoff)
+                        await asyncio.sleep(backoff)
+                        continue
 
                 # Authentication / Permission / Invalid API key check -> FAIL-FAST immediately without retrying
                 if (
@@ -196,8 +242,8 @@ class GeminiLLMAdapter(BaseLLMAdapter):
                         return await self.fallback_adapter.generate_investigation(system_prompt, user_prompt)
                     raise LLMProviderError(clean_msg)
 
-                # Non-retryable 400 Bad Request
-                if "400" in raw_err and not ("quota" in err_lower or "rate" in err_lower):
+                # Non-retryable 400 Bad Request / Invalid request
+                if any(code in raw_err for code in ("400", "401", "403")) or "invalid" in err_lower:
                     clean_msg = f"Invalid request to Gemini: {err_str}"
                     if self.fallback_adapter:
                         logger.warning("%s; invoking fallback adapter %s", clean_msg, self.fallback_adapter.provider_name)
@@ -230,12 +276,19 @@ class GeminiLLMAdapter(BaseLLMAdapter):
             clean_text = clean_text[:-3]
         clean_text = clean_text.strip()
 
+        # Isolate outermost JSON object if wrapped in explanatory text
+        if "{" in clean_text and "}" in clean_text:
+            first_brace = clean_text.find("{")
+            last_brace = clean_text.rfind("}")
+            if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+                clean_text = clean_text[first_brace:last_brace + 1]
+
         try:
             parsed = json.loads(clean_text)
             if isinstance(parsed, dict):
                 return parsed
-            raise ValueError("Root JSON entity must be an object/dict")
-        except (json.JSONDecodeError, ValueError):
+            raise LLMProviderError(f"LLM returned valid JSON but not an object dictionary: {type(parsed).__name__}")
+        except (json.JSONDecodeError, ValueError) as e:
             match = re.search(r"(\{.*\})", clean_text, re.DOTALL)
             if match:
                 try:
@@ -244,8 +297,8 @@ class GeminiLLMAdapter(BaseLLMAdapter):
                         return parsed
                 except (json.JSONDecodeError, ValueError):
                     pass
-            snippet = text[:150].replace("\n", " ")
-            raise LLMProviderError(f"LLM returned malformed JSON or non-dict root. Preview: {snippet}")
+            snippet = text[:200].replace("\n", " ")
+            raise LLMProviderError(f"LLM returned malformed JSON: {str(e)}. Raw text: {snippet}")
 
 
 class MockLLMAdapter(BaseLLMAdapter):
@@ -365,11 +418,18 @@ def get_llm_adapter(
     active_provider = (provider or settings.AI_PROVIDER or "gemini").lower()
 
     if active_provider == "gemini":
-        key = api_key or getattr(settings, "GEMINI_API_KEY", None) or getattr(settings, "AI_API_KEY", None) or os.environ.get("GEMINI_API_KEY") or os.environ.get("AI_API_KEY")
-        if key:
-            return GeminiLLMAdapter(api_key=key, model_name=model_name, fallback_adapter=fallback_adapter)
+        key = (
+            api_key
+            or settings.resolved_ai_api_key
+            or getattr(settings, "GEMINI_API_KEY", None)
+            or getattr(settings, "AI_API_KEY", None)
+            or os.environ.get("GEMINI_API_KEY")
+            or os.environ.get("AI_API_KEY")
+        )
+        if key and key.strip():
+            return GeminiLLMAdapter(api_key=key.strip(), model_name=model_name, fallback_adapter=fallback_adapter)
         elif settings.ENVIRONMENT in ("test", "development"):
-            logger.info("Gemini API key not configured; falling back to MockLLMAdapter for testing.")
+            logger.info("Gemini API key not configured; falling back to MockLLMAdapter for local test/dev.")
             return MockLLMAdapter()
         else:
             return GeminiLLMAdapter(api_key=None, model_name=model_name, fallback_adapter=fallback_adapter)

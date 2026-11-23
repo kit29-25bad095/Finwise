@@ -33,8 +33,8 @@ class Settings(BaseSettings):
     # Database: Supports PostgreSQL (postgresql://) and SQLite (sqlite://)
     DATABASE_URL: str = "sqlite:///./finora.db"
     SYNC_DATABASE_URL: str = "sqlite:///./finora.db"
-    DB_POOL_SIZE: int = 10
-    DB_MAX_OVERFLOW: int = 20
+    DB_POOL_SIZE: int = 20
+    DB_MAX_OVERFLOW: int = 10
     DB_POOL_TIMEOUT: int = 30
     DB_POOL_RECYCLE: int = 1800
     DB_POOL_PRE_PING: bool = True
@@ -95,6 +95,16 @@ class Settings(BaseSettings):
     FORENSIC_OUTBOX_BATCH_SIZE: int = 50
     FORENSIC_OUTBOX_LEASE_SECONDS: int = 60
 
+    @property
+    def resolved_ai_api_key(self) -> Optional[str]:
+        """
+        Returns sanitized API key from GEMINI_API_KEY or AI_API_KEY.
+        """
+        key = self.GEMINI_API_KEY or self.AI_API_KEY
+        if key and key.strip():
+            return key.strip()
+        return None
+
     # Financial Calculation Defaults
     DEFAULT_CURRENCY: str = "INR"
     DEFAULT_FEE_OVERCHARGE_TOLERANCE: Decimal = Decimal("0.05")
@@ -110,6 +120,19 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3000",
         "http://127.0.0.1:8000",
     ]
+
+    @property
+    def is_production(self) -> bool:
+        return self.ENVIRONMENT.lower() == "production"
+
+    def validate_production_readiness(self) -> List[str]:
+        issues = []
+        if self.is_production:
+            if "super-secure" in self.SECRET_KEY or len(self.SECRET_KEY) < 32:
+                issues.append("Production environment must override default development SECRET_KEY.")
+            if self.DATABASE_URL.startswith("sqlite"):
+                issues.append("Production environment must use PostgreSQL (DATABASE_URL starting with postgresql://).")
+        return issues
 
 
 settings = Settings()

@@ -1,84 +1,176 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Topbar } from "@/components/shell/Topbar";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Sparkles, ShieldCheck, AlertCircle, FileText } from "lucide-react";
+import { ApiClient, AIInvestigationStatus } from "@/lib/api";
+import {
+  Sparkles,
+  ShieldCheck,
+  AlertCircle,
+  FileText,
+  RefreshCw,
+  Cpu,
+  Key,
+  Lock,
+  CheckCircle2,
+} from "lucide-react";
 
 export default function InvestigationsPage() {
-  const investigations = [
-    {
-      id: "INV-2026-0041",
-      targetRef: "ORD-98422 (pay_Oz91M204Kpq)",
-      hypothesis: "Corporate Card interchange surcharge misclassified as domestic consumer card in settlement batch.",
-      evidenceCited: ["Schedule B Contract Tariff (1.85%)", "Settlement Batch SETL-20261110-09 (2.15% applied)"],
-      antiHallucinationCheck: "PASSED (All cited UTR and Order IDs grounded in PostgreSQL record)",
-      status: "COMPLETED",
-      timestamp: "12 Nov 2026, 01:45 IST",
-    },
-    {
-      id: "INV-2026-0042",
-      targetRef: "ORD-98423 (pay_Oz91M205Zaa)",
-      hypothesis: "Settlement hold caused by automated gateway risk check trigger during high-volume campaign.",
-      evidenceCited: ["Shopify order capture timestamp", "HDFC bank clearing window gap log"],
-      antiHallucinationCheck: "PASSED (Zero invented reference tokens)",
-      status: "COMPLETED",
-      timestamp: "12 Nov 2026, 02:10 IST",
-    },
-  ];
+  const [data, setData] = useState<AIInvestigationStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchAIStatus = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await ApiClient.getAIInvestigations();
+      setData(res);
+    } catch (err: any) {
+      setError(err.message || "Failed to query AI investigation gateway.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAIStatus();
+  }, []);
 
   return (
-    <>
-      <Topbar title="AI Forensic Investigations" breadcrumb="Investigation" />
-      <main className="p-6 space-y-6 max-w-7xl mx-auto w-full">
-        <div className="border-b border-border pb-4">
-          <h1 className="text-xl font-semibold tracking-tight text-ink-primary">
-            AI Forensic Investigation Dossiers
-          </h1>
-          <p className="text-xs text-ink-secondary mt-1">
-            Grounded forensic hypotheses with strict anti-hallucination citation validation. Zero financial calculation delegated.
-          </p>
+    <div className="flex flex-col min-h-screen bg-canvas">
+      <Topbar title="AI Forensic Investigations" breadcrumb="Financial Intelligence" />
+
+      <main className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto w-full">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-4">
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight text-ink-primary">
+              AI Forensic Investigation Panel
+            </h1>
+            <p className="text-xs text-ink-secondary mt-0.5">
+              Provider-agnostic LLM gateway with strict anti-hallucination citation validation
+            </p>
+          </div>
+
+          <Button
+            onClick={fetchAIStatus}
+            variant="outline"
+            size="sm"
+            disabled={loading}
+            className="text-xs font-mono"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? "animate-spin" : ""}`} />
+            Check Provider Status
+          </Button>
         </div>
 
-        <div className="space-y-4">
-          {investigations.map((inv) => (
-            <div key={inv.id} className="bg-surface border border-border p-5 space-y-3">
-              <div className="flex items-center justify-between border-b border-border pb-2.5">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs font-semibold text-ink-primary">{inv.id}</span>
-                  <span className="text-xs font-mono text-ink-muted">Target: {inv.targetRef}</span>
-                </div>
-                <Badge variant="matched">{inv.status}</Badge>
+        {/* Provider Status Card */}
+        <div className="border border-border bg-surface p-6 space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 border border-border bg-canvas">
+                <Cpu className="h-5 w-5 text-ink-primary" />
               </div>
-
               <div>
-                <span className="text-[10px] uppercase font-mono text-ink-muted font-semibold block mb-0.5">
-                  ROOT-CAUSE HYPOTHESIS
-                </span>
-                <p className="text-xs text-ink-primary leading-relaxed">{inv.hypothesis}</p>
-              </div>
-
-              <div className="bg-canvas border border-border p-3 space-y-2 text-xs font-mono">
-                <div className="text-[10px] uppercase text-ink-muted font-semibold">CITED EVIDENCE SOURCES</div>
-                <ul className="list-disc pl-4 space-y-0.5 text-ink-secondary">
-                  {inv.evidenceCited.map((e, i) => (
-                    <li key={i}>{e}</li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="flex items-center justify-between pt-2 border-t border-border text-[11px] font-mono text-ink-secondary">
-                <span className="flex items-center gap-1.5 text-zinc-700">
-                  <ShieldCheck className="h-3.5 w-3.5" />
-                  {inv.antiHallucinationCheck}
-                </span>
-                <span className="text-ink-muted">{inv.timestamp}</span>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-semibold text-ink-primary">
+                    Provider: {data?.provider || "GOOGLE_GEMINI"}
+                  </h2>
+                  <Badge variant={data?.is_configured ? "matched" : "pending"}>
+                    {data?.status || "PENDING_CONFIGURATION"}
+                  </Badge>
+                </div>
+                <p className="text-xs text-ink-secondary mt-0.5">
+                  Target Model: {data?.model_version || "gemini-2.0-flash / gemini-1.5-pro"}
+                </p>
               </div>
             </div>
-          ))}
+
+            <div className="text-right text-xs font-mono">
+              <span className="text-ink-muted uppercase text-[10px] block">Investigation Queue</span>
+              <span className="font-semibold text-ink-primary">
+                {data?.investigations_count || 0} Dossiers Generated
+              </span>
+            </div>
+          </div>
+
+          {/* Pending Configuration Notice (Graceful degraded state) */}
+          {!data?.is_configured && (
+            <div className="p-5 border border-status-pending-text/30 bg-status-pending-bg space-y-3">
+              <div className="flex items-center gap-2 text-status-pending-text font-semibold text-xs">
+                <Key className="h-4 w-4" />
+                <span>Google Gemini API Integration Pending Configuration</span>
+              </div>
+              <p className="text-xs text-ink-secondary leading-relaxed font-sans">
+                {data?.message ||
+                  "Google Gemini API integration is currently pending API key provisioning. AI-assisted forensic dossiers and grounded dispute recovery narratives will activate automatically once the GEMINI_API_KEY environment variable is configured."}
+              </p>
+              <div className="pt-2 border-t border-border/50 text-[11px] font-mono text-ink-muted">
+                Core deterministic reconciliation, fee overcharge detection, and bounded knapsack matching operate 100% locally without external AI dependency.
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* AI Governance & Anti-Hallucination Architecture */}
+        <div className="border border-border bg-surface p-6 space-y-4">
+          <h2 className="text-xs font-mono uppercase tracking-wider text-ink-muted">
+            Strict AI Governance & Zero Financial Delegation Mandate
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
+            <div className="p-4 border border-border bg-canvas space-y-2">
+              <div className="flex items-center gap-1.5 font-semibold text-ink-primary">
+                <ShieldCheck className="h-4 w-4 text-ink-primary" />
+                <span>Zero Math Delegation</span>
+              </div>
+              <p className="text-ink-secondary text-[11px] font-sans leading-relaxed">
+                100% of mathematical allocations, tolerances, and MDR deductions are computed by deterministic Python routines. The AI never calculates financial balances.
+              </p>
+            </div>
+
+            <div className="p-4 border border-border bg-canvas space-y-2">
+              <div className="flex items-center gap-1.5 font-semibold text-ink-primary">
+                <Lock className="h-4 w-4 text-ink-primary" />
+                <span>PII-Scrubbed Evidence</span>
+              </div>
+              <p className="text-ink-secondary text-[11px] font-sans leading-relaxed">
+                Free-text customer names, order notes, and banking remarks are permanently scrubbed before generating structured evidence bundles.
+              </p>
+            </div>
+
+            <div className="p-4 border border-border bg-canvas space-y-2">
+              <div className="flex items-center gap-1.5 font-semibold text-ink-primary">
+                <CheckCircle2 className="h-4 w-4 text-ink-primary" />
+                <span>Citation Verification</span>
+              </div>
+              <p className="text-ink-secondary text-[11px] font-sans leading-relaxed">
+                Every generated hypothesis must cite verified database row offsets and UTRs. Unsubstantiated claims are automatically flagged and rejected.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Investigation History Table / Empty State */}
+        <div className="border border-border bg-surface p-4 space-y-4">
+          <h2 className="text-xs font-mono uppercase tracking-wider text-ink-muted">
+            Completed Investigation Dossiers
+          </h2>
+
+          <div className="border border-border p-8 text-center space-y-2">
+            <FileText className="h-8 w-8 mx-auto text-ink-muted" strokeWidth={1.5} />
+            <div className="text-xs font-semibold text-ink-primary font-mono">
+              No Fabricated Findings
+            </div>
+            <p className="text-xs text-ink-secondary max-w-md mx-auto">
+              In accordance with Finora Core Financial Principle #3, completed investigations are never simulated or fabricated. AI dossiers will appear here once active.
+            </p>
+          </div>
         </div>
       </main>
-    </>
+    </div>
   );
 }

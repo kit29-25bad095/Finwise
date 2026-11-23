@@ -2,7 +2,7 @@ import React from "react";
 import { cn } from "@/lib/utils";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "secondary" | "subtle" | "danger";
+  variant?: "primary" | "secondary" | "subtle" | "danger" | "outline" | "ghost";
   size?: "sm" | "md" | "lg";
   loading?: boolean;
 }
@@ -17,6 +17,8 @@ export function Button({
   ...props
 }: ButtonProps) {
   const baseStyles = "inline-flex items-center justify-center font-medium transition-colors border select-none disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-1 focus:ring-ink-primary";
+
+  const resolvedVariant = variant === "outline" ? "secondary" : variant === "ghost" ? "subtle" : variant;
 
   const variantStyles = {
     // Primary: Black background #18181B, white text
@@ -37,7 +39,7 @@ export function Button({
 
   return (
     <button
-      className={cn(baseStyles, variantStyles[variant], sizeStyles[size], className)}
+      className={cn(baseStyles, variantStyles[resolvedVariant], sizeStyles[size], className)}
       disabled={disabled || loading}
       {...props}
     >

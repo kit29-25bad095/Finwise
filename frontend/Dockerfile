@@ -1,11 +1,10 @@
-# Multi-stage production Dockerfile for Finora Next.js Frontend
+# Multi-stage production Dockerfile for Finora Next.js Frontend (Standalone)
 FROM node:20-alpine AS base
 
 # Stage 1: Install dependencies
 FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
-
 COPY package.json package-lock.json* ./
 RUN npm ci
 
@@ -14,16 +13,13 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
-
 RUN npm run build
 
 # Stage 3: Minimal hardened production runner
 FROM base AS runner
 WORKDIR /app
-
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3100

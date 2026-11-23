@@ -11,6 +11,7 @@ downloads/
 eggs/
 .eggs/
 lib/
+!frontend/src/lib/
 lib64/
 !frontend/src/lib/
 parts/
@@ -26,6 +27,8 @@ wheels/
 # Environment files
 .env*
 !.env*.example
+*.pem
+*.key
 
 # Virtual Environments
 .venv
