@@ -57,6 +57,12 @@ class Settings(BaseSettings):
                 data["AI_API_KEY"] = data["GEMINI_API_KEY"]
             elif "AI_API_KEY" not in data and os.environ.get("GEMINI_API_KEY"):
                 data["AI_API_KEY"] = os.environ.get("GEMINI_API_KEY")
+
+            # Support FINORA_STORAGE_DIR alias for STORAGE_DIR
+            if "STORAGE_DIR" not in data and "FINORA_STORAGE_DIR" in data:
+                data["STORAGE_DIR"] = data["FINORA_STORAGE_DIR"]
+            elif "STORAGE_DIR" not in data and os.environ.get("FINORA_STORAGE_DIR"):
+                data["STORAGE_DIR"] = os.environ.get("FINORA_STORAGE_DIR")
         return data
 
     @model_validator(mode="after")

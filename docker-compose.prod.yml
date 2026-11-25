@@ -1,8 +1,11 @@
 version: '3.8'
 
+# ==============================================================================
 # Finora Production Multi-Container Infrastructure
+# Optimized for Amazon Lightsail (4 GB RAM, 2 vCPUs, 80 GB SSD) - Mumbai (ap-south-1)
 # Implements strict network segregation, non-root least privilege,
-# healthchecks, resource bounds, and zero public exposure of backing services.
+# healthchecks, resource bounds, log rotation, and zero public exposure of DB/Redis.
+# ==============================================================================
 
 networks:
   frontend_net:
@@ -13,7 +16,7 @@ networks:
     internal: false
   data_net:
     driver: bridge
-    internal: true  # Fully isolated internal data network (no outbound internet or inbound exposure)
+    internal: true  # Fully isolated internal data network (zero inbound or outbound public exposure)
 
 volumes:
   postgres_data:
@@ -21,18 +24,20 @@ volumes:
   redis_data:
     driver: local
   finora_storage:
-    driver: local  # Dedicated private volume for financial documents
+    driver: local  # Dedicated private volume for financial evidence documents
+  backup_data:
+    driver: local  # Local snapshot staging directory before S3 offsite synchronization
   nginx_certs:
     driver: local
   certbot_challenge:
     driver: local
 
 services:
-  # 1. Reverse Proxy & SSL Termination
+  # 1. Reverse Proxy & SSL Termination (Nginx)
   reverse-proxy:
     image: nginx:1.27-alpine
     container_name: finora-proxy
-    restart: always
+    restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
@@ -49,19 +54,26 @@ services:
         condition: service_healthy
       frontend:
         condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
     deploy:
       resources:
         limits:
-          cpus: '0.50'
-          memory: 256M
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          memory: 32M
 
-  # 2. Next.js Frontend UI
+  # 2. Next.js Frontend UI (Standalone Server)
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: finora-frontend
-    restart: always
+    restart: unless-stopped
     expose:
       - "3100"
     environment:
@@ -76,11 +88,18 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
     deploy:
       resources:
         limits:
-          cpus: '1.00'
-          memory: 1024M
+          cpus: '0.50'
+          memory: 384M
+        reservations:
+          memory: 128M
 
   # 3. FastAPI Core Backend Service
   backend:
@@ -88,7 +107,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: finora-backend
-    restart: always
+    restart: unless-stopped
     command: >
       sh -c "alembic upgrade head &&
              gunicorn -c gunicorn_conf.py app.main:app"
@@ -100,15 +119,20 @@ services:
       SYNC_DATABASE_URL: postgresql://${POSTGRES_USER:-finora_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-finora_prod}
       REDIS_URL: redis://:${REDIS_PASSWORD:-finora_redis_secret}@redis:6379/0
       SECRET_KEY: ${SECRET_KEY:?Production SECRET_KEY must be provided}
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
       AI_PROVIDER: ${AI_PROVIDER:-gemini}
       AI_MODEL: ${AI_MODEL:-gemini-3.5-flash-lite}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       AI_API_KEY: ${GEMINI_API_KEY}
       WORKER_FALLBACK_SYNC: "False"
+      STORAGE_DIR: /var/finora/storage
       FINORA_STORAGE_DIR: /var/finora/storage
       FILE_RETENTION_DAYS: ${FILE_RETENTION_DAYS:-2555}
-      ACCESS_TOKEN_EXPIRE_MINUTES: 1440
-      BACKEND_CORS_ORIGINS: '["https://finora.yourdomain.com", "http://localhost:3100"]'
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-15}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      JWT_REVOCATION_PREFIX: "finora:revoked_token:"
+      JWT_REVOCATION_FAIL_SECURE: "True"
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-'["http://localhost:3100"]'}
     volumes:
       - finora_storage:/var/finora/storage
     networks:
@@ -124,13 +148,20 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
-      start_period: 15s
+      start_period: 20s
     stop_grace_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
     deploy:
       resources:
         limits:
-          cpus: '2.00'
-          memory: 2048M
+          cpus: '1.00'
+          memory: 896M
+        reservations:
+          memory: 384M
 
   # 4. Asynchronous Background Task Worker (RQ Worker)
   worker:
@@ -139,7 +170,7 @@ services:
       dockerfile: Dockerfile
     command: ["python", "-m", "app.workers.worker_entrypoint", "finora_reconciliation_tasks"]
     container_name: finora-worker
-    restart: always
+    restart: unless-stopped
     environment:
       ENVIRONMENT: production
       DATABASE_URL: postgresql://${POSTGRES_USER:-finora_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-finora_prod}
@@ -151,7 +182,10 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       AI_API_KEY: ${GEMINI_API_KEY}
       WORKER_FALLBACK_SYNC: "False"
+      STORAGE_DIR: /var/finora/storage
       FINORA_STORAGE_DIR: /var/finora/storage
+      JWT_REVOCATION_PREFIX: "finora:revoked_token:"
+      JWT_REVOCATION_FAIL_SECURE: "True"
     volumes:
       - finora_storage:/var/finora/storage
     networks:
@@ -162,11 +196,18 @@ services:
       redis:
         condition: service_healthy
     stop_grace_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
     deploy:
       resources:
         limits:
-          cpus: '2.00'
-          memory: 2048M
+          cpus: '1.00'
+          memory: 640M
+        reservations:
+          memory: 256M
 
   # 5. Outbox Publisher & Orphan Investigation Reaper Scheduler
   scheduler:
@@ -175,7 +216,7 @@ services:
       dockerfile: Dockerfile
     command: ["python", "-m", "app.workers.scheduler"]
     container_name: finora-scheduler
-    restart: always
+    restart: unless-stopped
     environment:
       ENVIRONMENT: production
       DATABASE_URL: postgresql://${POSTGRES_USER:-finora_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-finora_prod}
@@ -187,6 +228,7 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       AI_API_KEY: ${GEMINI_API_KEY}
       WORKER_FALLBACK_SYNC: "False"
+      STORAGE_DIR: /var/finora/storage
       FINORA_STORAGE_DIR: /var/finora/storage
       FILE_RETENTION_DAYS: ${FILE_RETENTION_DAYS:-2555}
     volumes:
@@ -199,17 +241,32 @@ services:
       redis:
         condition: service_healthy
     stop_grace_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
     deploy:
       resources:
         limits:
-          cpus: '0.50'
-          memory: 512M
+          cpus: '0.25'
+          memory: 192M
+        reservations:
+          memory: 64M
 
-  # 6. Production PostgreSQL Database (PostgreSQL 17)
+  # 6. Production PostgreSQL Database (PostgreSQL 17 Alpine)
   postgres:
     image: postgres:17-alpine
     container_name: finora-postgres
-    restart: always
+    restart: unless-stopped
+    command: >
+      postgres
+      -c shared_buffers=128MB
+      -c work_mem=4MB
+      -c maintenance_work_mem=64MB
+      -c max_connections=50
+      -c effective_cache_size=384MB
+      -c wal_buffers=4MB
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-finora_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Database password required}
@@ -224,22 +281,29 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
     deploy:
       resources:
         limits:
-          cpus: '2.00'
-          memory: 4096M
+          cpus: '1.00'
+          memory: 768M
+        reservations:
+          memory: 256M
 
-  # 7. Production Redis Queue & Broker (Redis 7)
+  # 7. Production Redis Queue & Broker (Redis 7 Alpine)
   redis:
     image: redis:7-alpine
     container_name: finora-redis
-    restart: always
+    restart: unless-stopped
     command: >
       redis-server
       --requirepass ${REDIS_PASSWORD:-finora_redis_secret}
       --appendonly yes
-      --maxmemory 512mb
+      --maxmemory 192mb
       --maxmemory-policy noeviction
     volumes:
       - redis_data:/data
@@ -251,8 +315,15 @@ services:
       timeout: 5s
       retries: 5
       start_period: 5s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
     deploy:
       resources:
         limits:
-          cpus: '1.00'
-          memory: 1024M
+          cpus: '0.50'
+          memory: 256M
+        reservations:
+          memory: 64M
