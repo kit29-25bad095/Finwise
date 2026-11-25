@@ -63,7 +63,7 @@ class GeminiLLMAdapter(BaseLLMAdapter):
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
+        api_key: Any = ...,
         model_name: Optional[str] = None,
         temperature: float = 0.1,
         max_tokens: int = 2048,
@@ -77,12 +77,14 @@ class GeminiLLMAdapter(BaseLLMAdapter):
             logger.info("Mapping deprecated model %s to gemini-3.1-flash-lite", model)
             model = "gemini-3.1-flash-lite"
         super().__init__(model_name=model, temperature=temperature, max_tokens=max_tokens)
-        resolved_key = (
-            api_key
-            or settings.resolved_ai_api_key
-            or os.environ.get("GEMINI_API_KEY")
-            or os.environ.get("AI_API_KEY")
-        )
+        if api_key is Ellipsis:
+            resolved_key = (
+                settings.resolved_ai_api_key
+                or os.environ.get("GEMINI_API_KEY")
+                or os.environ.get("AI_API_KEY")
+            )
+        else:
+            resolved_key = api_key
         self.api_key = resolved_key.strip() if resolved_key and resolved_key.strip() else None
         self.timeout_seconds = timeout_seconds
         self.max_retries = max_retries
