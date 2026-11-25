@@ -1,7 +1,8 @@
 import time
 import threading
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 from fastapi import Request, HTTPException, status
+from app.core.config import settings
 
 
 class InMemoryRateLimiter:
@@ -16,12 +17,14 @@ class InMemoryRateLimiter:
         requests_limit: int = 10,
         window_seconds: int = 60,
         lockout_threshold: int = 5,
-        lockout_duration_seconds: int = 60
+        lockout_duration_seconds: int = 60,
+        enabled: bool = True,
     ):
         self.requests_limit = requests_limit
         self.window_seconds = window_seconds
         self.lockout_threshold = lockout_threshold
         self.lockout_duration_seconds = lockout_duration_seconds
+        self.enabled = enabled
         self._lock = threading.Lock()
         # client_ip -> [timestamps]
         self._requests: Dict[str, list] = {}
@@ -38,6 +41,8 @@ class InMemoryRateLimiter:
         return "127.0.0.1"
 
     def check_rate_limit(self, request: Request) -> None:
+        if not self.enabled:
+            return
         ip = self._get_client_ip(request)
         now = time.time()
 
@@ -74,6 +79,8 @@ class InMemoryRateLimiter:
             self._requests[ip].append(now)
 
     def record_failure(self, request: Request) -> None:
+        if not self.enabled:
+            return
         ip = self._get_client_ip(request)
         now = time.time()
 
@@ -86,6 +93,8 @@ class InMemoryRateLimiter:
             self._failures[ip] = (fail_count, lockout_until)
 
     def record_success(self, request: Request) -> None:
+        if not self.enabled:
+            return
         ip = self._get_client_ip(request)
         with self._lock:
             if ip in self._failures:
@@ -102,7 +111,8 @@ auth_rate_limiter = InMemoryRateLimiter(
     requests_limit=10,
     window_seconds=60,
     lockout_threshold=5,
-    lockout_duration_seconds=60
+    lockout_duration_seconds=60,
+    enabled=(settings.ENVIRONMENT != "test")
 )
 
 # Global CSV file upload rate limiter (30 uploads/minute per client IP)
@@ -110,7 +120,8 @@ upload_rate_limiter = InMemoryRateLimiter(
     requests_limit=30,
     window_seconds=60,
     lockout_threshold=10,
-    lockout_duration_seconds=60
+    lockout_duration_seconds=60,
+    enabled=(settings.ENVIRONMENT != "test")
 )
 
 # Global AI forensic investigation rate limiter (20 investigations/minute per client IP)
@@ -118,6 +129,7 @@ forensic_rate_limiter = InMemoryRateLimiter(
     requests_limit=20,
     window_seconds=60,
     lockout_threshold=8,
-    lockout_duration_seconds=60
+    lockout_duration_seconds=60,
+    enabled=(settings.ENVIRONMENT != "test")
 )
 

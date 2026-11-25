@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
     WORKER_FALLBACK_SYNC: bool = True
 
+    # JWT Token Revocation Settings
+    JWT_REVOCATION_PREFIX: str = "finora:revoked_token:"
+    JWT_REVOCATION_FAIL_SECURE: bool = True
+
     @model_validator(mode="before")
     @classmethod
     def populate_ai_api_key(cls, data: Any) -> Any:
