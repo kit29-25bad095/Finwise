@@ -9,9 +9,10 @@
 set -euo pipefail
 
 CERT_DIR="./nginx/certs"
+CHALLENGE_DIR="./certbot/www"
 DOMAIN="${1:-}"
 
-mkdir -p "${CERT_DIR}"
+mkdir -p "${CERT_DIR}" "${CHALLENGE_DIR}"
 
 if [ ! -f "${CERT_DIR}/finora.crt" ] || [ ! -f "${CERT_DIR}/finora.key" ]; then
     echo "[INFO] No existing SSL certificate found. Generating self-signed bootstrap certificate..."

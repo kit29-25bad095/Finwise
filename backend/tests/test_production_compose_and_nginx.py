@@ -185,3 +185,39 @@ def test_07_env_production_documentation_parity(repo_root):
 
     for var in critical_vars:
         assert var in env_text, f"Critical variable {var} missing from .env.production.example"
+
+
+def test_08_certbot_ssl_and_backup_scripts(repo_root):
+    """Verify TLS bootstrap, renewal, and S3 backup scripts have correct paths and safeguards."""
+    compose_path = repo_root / "docker-compose.prod.yml"
+    with open(compose_path, "r", encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+
+    proxy_volumes = cfg["services"]["reverse-proxy"]["volumes"]
+    assert any("./nginx/certs:/etc/nginx/certs:ro" in v for v in proxy_volumes), "Nginx certs host bind mount missing"
+    assert any("./certbot/www:/var/www/certbot:ro" in v for v in proxy_volumes), "Certbot challenge host bind mount missing"
+
+    # Verify scripts
+    bootstrap_script = repo_root / "scripts" / "bootstrap_ssl.sh"
+    renew_script = repo_root / "scripts" / "renew_certs.sh"
+    backup_script = repo_root / "scripts" / "backup_to_s3.sh"
+    restore_script = repo_root / "scripts" / "restore_from_s3.sh"
+
+    assert bootstrap_script.exists()
+    assert renew_script.exists()
+    assert backup_script.exists()
+    assert restore_script.exists()
+
+    bootstrap_text = bootstrap_script.read_text(encoding="utf-8")
+    assert "./nginx/certs" in bootstrap_text
+    assert "./certbot/www" in bootstrap_text
+
+    renew_text = renew_script.read_text(encoding="utf-8")
+    assert "certbot renew" in renew_text
+    assert "nginx -s reload" in renew_text
+    assert "chmod 600" in renew_text
+
+    backup_text = backup_script.read_text(encoding="utf-8")
+    assert "finora_production-backups-mumbai" in backup_text or "AWS_S3_BACKUP_BUCKET" in backup_text
+    assert "AES256" in backup_text
+

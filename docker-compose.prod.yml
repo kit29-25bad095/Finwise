@@ -27,10 +27,6 @@ volumes:
     driver: local  # Dedicated private volume for financial evidence documents
   backup_data:
     driver: local  # Local snapshot staging directory before S3 offsite synchronization
-  nginx_certs:
-    driver: local
-  certbot_challenge:
-    driver: local
 
 services:
   # 1. Reverse Proxy & SSL Termination (Nginx)
@@ -44,8 +40,8 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - nginx_certs:/etc/nginx/certs:ro
-      - certbot_challenge:/var/www/certbot:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      - ./certbot/www:/var/www/certbot:ro
     networks:
       - frontend_net
       - backend_net
